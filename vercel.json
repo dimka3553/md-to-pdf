@@ -1,8 +1,13 @@
 {
     "functions": {
         "src/app/api/convert/route.js": {
-            "memory": 1000,
+            "memory": 1024,
             "maxDuration": 60
+        }
+    },
+    "build": {
+        "env": {
+            "NEXT_PUBLIC_VERCEL_ENVIRONMENT": "production"
         }
     }
 }

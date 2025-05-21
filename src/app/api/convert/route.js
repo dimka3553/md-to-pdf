@@ -7,39 +7,28 @@ import hljs from 'highlight.js';
 import twemoji from 'twemoji';
 import path from 'path';
 
-// Remote Chromium executable path for Vercel - updated to latest version as per tutorial
+// Remote Chromium executable path for Vercel
 const remoteExecutablePath = "https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar";
 
 // Browser instance cache
 let browser;
 
-// Get or create browser instance - updated to match tutorial's configuration
+// Get or create browser instance
 async function getBrowser() {
   if (browser) return browser;
 
   if (process.env.NEXT_PUBLIC_VERCEL_ENVIRONMENT === "production") {
-    // Vercel production environment
+    // Vercel production environment – configuration aligned with tutorial
     browser = await puppeteerCore.launch({
-      args: [
-        ...chromium.args,
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-gpu',
-        '--disable-dev-shm-usage',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-extensions'
-      ],
+      args: chromium.args,
       executablePath: await chromium.executablePath(remoteExecutablePath),
       headless: true,
-      ignoreHTTPSErrors: true
     });
   } else {
-    // Local development environment
+    // Local development environment – configuration aligned with tutorial
     browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      headless: true
+      headless: true,
     });
   }
   return browser;
