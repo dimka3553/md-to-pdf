@@ -9,24 +9,30 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@sparticuz/chromium-min": "^121.0.0",
     "axios": "^1.9.0",
     "easymde": "^2.20.0",
     "fs-extra": "^11.3.0",
     "highlight.js": "^11.11.1",
-    "html-pdf-node": "^1.0.8",
     "marked": "^15.0.12",
     "mermaid": "^10.9.3",
     "next": "15.3.2",
     "node-fetch": "^2.7.0",
     "pdfkit": "^0.17.1",
+
     "puppeteer-core": "^24.9.0",
     "@sparticuz/chromium-min": "^133.0.0",
+
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-simplemde-editor": "^5.2.0",
     "sharp": "^0.34.2",
     "twemoji": "^14.0.2",
     "uuid": "^11.1.0"
+  },
+  "overrides": {
+    "puppeteer": "^21.9.0",
+    "puppeteer-core": "^21.9.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
