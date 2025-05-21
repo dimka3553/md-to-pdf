@@ -276,6 +276,8 @@ function generateStyledHtml(htmlContent, theme, paperSize) {
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/${theme === darkTheme ? 'atom-one-dark' : 'atom-one-light'}.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
   <style>
     /* Base styles */
     html, body {
@@ -1128,6 +1130,55 @@ function generateStyledHtml(htmlContent, theme, paperSize) {
     .footnote-backref:hover {
       text-decoration: underline;
     }
+
+    /* Add KaTeX styles */
+    .katex-display {
+      margin: 1em 0;
+      text-align: center;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 0.5em 0;
+    }
+    
+    .katex {
+      font-size: 1.1em;
+      line-height: 1.2;
+      text-indent: 0;
+      text-rendering: auto;
+    }
+    
+    .katex-display > .katex {
+      display: inline-block;
+      text-align: center;
+      max-width: 100%;
+    }
+    
+    /* Ensure equations don't break across pages */
+    .katex-display, .katex-block {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    
+    /* Inline math */
+    .katex-inline {
+      display: inline-block;
+      vertical-align: middle;
+      font-size: 1em;
+    }
+    
+    /* Dark theme support for KaTeX */
+    .dark-theme .katex {
+      color: ${theme === darkTheme ? theme.textColor : 'inherit'};
+    }
+    
+    .dark-theme .katex .mord,
+    .dark-theme .katex .mbin,
+    .dark-theme .katex .mrel,
+    .dark-theme .katex .mopen,
+    .dark-theme .katex .mclose,
+    .dark-theme .katex .mpunct {
+      color: ${theme === darkTheme ? theme.textColor : 'inherit'};
+    }
   </style>
 </head>
 <body>
@@ -1135,7 +1186,36 @@ function generateStyledHtml(htmlContent, theme, paperSize) {
     ${htmlContent}
   </div>
   
-  <!-- Smart page breaks handled in Puppeteer evaluation step; removed inline JS to avoid duplicate break logic -->
+  <script>
+    // Initialize KaTeX for any math that was rendered
+    document.addEventListener('DOMContentLoaded', function() {
+      // Render display math ($$...$$)
+      document.querySelectorAll('.math-display').forEach(function(element) {
+        try {
+          katex.render(element.textContent, element, {
+            displayMode: true,
+            throwOnError: false,
+            output: 'html'
+          });
+        } catch (e) {
+          console.error('KaTeX display math rendering error:', e);
+        }
+      });
+      
+      // Render inline math ($...$)
+      document.querySelectorAll('.math-inline').forEach(function(element) {
+        try {
+          katex.render(element.textContent, element, {
+            displayMode: false,
+            throwOnError: false,
+            output: 'html'
+          });
+        } catch (e) {
+          console.error('KaTeX inline math rendering error:', e);
+        }
+      });
+    });
+  </script>
 </body>
 </html>`;
 }
@@ -1377,6 +1457,33 @@ marked.setOptions({
   xhtml: true
 });
 
+// Add custom renderer for math expressions
+renderer.text = function(text) {
+  let processed = text;
+  
+  // Handle display math ($$...$$)
+  processed = processed.replace(/\$\$([\s\S]+?)\$\$/g, function(match, math) {
+    try {
+      return `<div class="math-display">${math}</div>`;
+    } catch (e) {
+      console.error('Error rendering display math:', e);
+      return match;
+    }
+  });
+  
+  // Handle inline math ($...$)
+  processed = processed.replace(/\$([^\$]+?)\$/g, function(match, math) {
+    try {
+      return `<span class="math-inline">${math}</span>`;
+    } catch (e) {
+      console.error('Error rendering inline math:', e);
+      return match;
+    }
+  });
+  
+  return processed;
+};
+
 export async function POST(request) {
   try {
     const data = await request.json();
@@ -1499,8 +1606,44 @@ export async function POST(request) {
         };
         
         await waitForAllImages();
+
+        // Initialize KaTeX for math expressions
+        const renderMath = async () => {
+          // Wait for KaTeX to be available
+          while (typeof katex === 'undefined') {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+
+          // Render display math
+          document.querySelectorAll('.math-display').forEach(element => {
+            try {
+              katex.render(element.textContent, element, {
+                displayMode: true,
+                throwOnError: false,
+                output: 'html'
+              });
+            } catch (e) {
+              console.error('KaTeX display math rendering error:', e);
+            }
+          });
+
+          // Render inline math
+          document.querySelectorAll('.math-inline').forEach(element => {
+            try {
+              katex.render(element.textContent, element, {
+                displayMode: false,
+                throwOnError: false,
+                output: 'html'
+              });
+            } catch (e) {
+              console.error('KaTeX inline math rendering error:', e);
+            }
+          });
+        };
+
+        await renderMath();
         
-        // Apply smart page break logic after images are loaded
+        // Apply smart page break logic after images and math are loaded
         // Give time for page to render before applying breaks
         const PAGE_HEIGHT_PX = 1123; // A4 height in pixels at 96 DPI
         const TOP_MARGIN_PX = 40;
@@ -1569,8 +1712,8 @@ export async function POST(request) {
         });
       });
 
-      // Wait for page break logic to execute
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for page break logic and math rendering to execute
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Generate PDF with specific settings
       const pdf = await page.pdf({
