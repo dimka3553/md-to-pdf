@@ -290,7 +290,15 @@ This sentence has a footnote.[^3]
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      setPdfUrl(url); // Set URL for download link
+      setPdfUrl(url);
+
+      // Create a temporary link and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = downloadFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
     } catch (err) {
       console.error("Error generating PDF:", err);
@@ -369,19 +377,6 @@ This sentence has a footnote.[^3]
                   </span>
                 ) : 'Generate PDF'}
               </button>
-              
-              {pdfUrl && (
-                <a
-                  href={pdfUrl}
-                  download={downloadFileName}
-                  className={`inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 ${theme === 'dark' ? 'bg-green-600 hover:bg-green-700 text-white focus:ring-green-400/50' : 'bg-green-600 hover:bg-green-700 text-white focus:ring-green-400/50'}`}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Download
-                </a>
-              )}
             </div>
           </div>
         </div>
