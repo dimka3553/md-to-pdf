@@ -601,7 +601,7 @@ function generateStyledHtml(htmlContent, theme, paperSize) {
       margin-bottom: 0;
     }
     
-    /* Enhanced code block styling */
+    /* Code blocks - enhanced styling */
     .code-block {
       margin: 1.2em 0;
       border-radius: 8px;
@@ -611,168 +611,248 @@ function generateStyledHtml(htmlContent, theme, paperSize) {
       page-break-inside: avoid;
       break-inside: avoid;
       position: relative;
-      font-family: 'JetBrains Mono', monospace;
     }
-
-    .code-block pre {
-      margin: 0;
-      padding: 1em;
-      overflow-x: auto;
+    
+    .code-title {
+      background-color: ${theme === darkTheme ? '#1a2233' : '#e2e8f0'};
+      color: ${theme.textColor};
+      font-family: 'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
       font-size: 8pt;
-      line-height: 1.5;
-      background: transparent;
+      font-weight: 500;
+      padding: 0.4em 0.8em;
+      border-bottom: 1px solid ${theme.borderColor};
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
     }
-
-    .code-block code {
-      font-family: inherit;
-      padding: 0;
-      background: transparent;
-      border: none;
-      white-space: pre;
-      word-spacing: normal;
-      word-break: normal;
-      word-wrap: normal;
-      line-height: 1.5;
-      tab-size: 4;
-      hyphens: none;
+    
+    .code-container {
+      display: flex;
+      overflow-x: auto;
     }
-
-    /* Shell/bash specific styling */
-    .bash-code pre, .shell-code pre {
-      counter-reset: line;
-    }
-
-    .bash-code pre code, .shell-code pre code {
-      display: block;
-      line-height: 1.5;
-      position: relative;
-      padding-left: 0.5em;
-    }
-
-    .bash-code pre code::before, .shell-code pre code::before {
-      color: ${theme === darkTheme ? '#4B5563' : '#94A3B8'};
-      content: "$";
-      margin-right: 1em;
-      user-select: none;
-    }
-
-    /* Enhanced list styling */
-    ul.balanced-list, ol.balanced-list {
-      padding-left: 0;
-      margin: 0.8em 0;
-      list-style-type: none;
-      counter-reset: list-counter;
-    }
-
-    ul.balanced-list li, ol.balanced-list li {
-      margin: 0.4em 0;
-      line-height: 1.5;
-      position: relative;
-      padding-left: 2em;
-    }
-
-    /* Unordered list bullets */
-    ul.balanced-list > li::before {
-      content: "•";
-      position: absolute;
-      left: 0.5em;
-      color: ${theme.accentColor};
-      font-weight: bold;
-      display: inline-block;
-      width: 1em;
-      text-align: center;
-    }
-
-    /* Ordered list numbers */
-    ol.balanced-list > li {
-      counter-increment: list-counter;
-    }
-
-    ol.balanced-list > li::before {
-      content: counter(list-counter) ".";
-      position: absolute;
-      left: 0;
-      width: 1.5em;
+    
+    .line-numbers {
+      display: flex;
+      flex-direction: column;
+      padding: 0.8em 0;
+      background-color: ${theme === darkTheme ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)'};
+      color: ${theme === darkTheme ? '#6b7280' : '#94a3b8'};
       text-align: right;
-      color: ${theme.accentColor};
-      font-weight: bold;
-    }
-
-    /* Nested lists */
-    ul.balanced-list ul, ol.balanced-list ol,
-    ul.balanced-list ol, ol.balanced-list ul {
-      margin: 0.3em 0 0.3em 0;
+      font-family: 'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+      font-size: 8pt;
+      user-select: none;
+      min-width: 2em;
+      padding-right: 0.5em;
       padding-left: 0.5em;
-      counter-reset: list-counter;
     }
-
-    /* Nested unordered list bullets */
-    ul.balanced-list ul > li::before {
-      content: "◦";
+    
+    .line-content {
+      white-space: pre;
     }
-
-    ul.balanced-list ul ul > li::before {
-      content: "▪";
+    
+    .code-line {
+      display: block;
+      white-space: pre;
+      line-height: 1.4;
     }
-
-    /* Nested ordered list numbers */
-    ol.balanced-list ol {
-      counter-reset: nested-counter;
+    
+    pre {
+      background-color: ${theme.codeBackgroundColor};
+      border-radius: 6px;
+      padding: 0.8em;
+      margin: 0;
+      overflow-x: auto;
+      font-size: 8.25pt;
+      flex-grow: 1;
     }
-
-    ol.balanced-list ol > li {
-      counter-increment: nested-counter;
+    
+    code {
+      font-family: 'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+      font-size: 8.25pt;
+      background-color: ${theme.codeBackgroundColor};
+      padding: 0.15em 0.3em;
+      border-radius: 3px;
+      border: 1px solid ${theme.borderColor};
     }
-
-    ol.balanced-list ol > li::before {
-      content: counter(list-counter) "." counter(nested-counter) ".";
-      width: 2.5em;
+    
+    pre code {
+      padding: 0;
+      border: none;
+      background-color: transparent;
+      font-size: 8pt;
+      line-height: 1.4;
+      display: block;
+      white-space: pre-wrap;
+      text-align: left;
+      overflow: visible;
     }
-
-    /* Indentation for nested items */
-    ul.balanced-list ul li, ol.balanced-list ol li,
-    ul.balanced-list ol li, ol.balanced-list ul li {
-      padding-left: 2.5em;
+    
+    /* Language specific styling */
+    .typescript-code .code-title:before,
+    .javascript-code .code-title:before,
+    .python-code .code-title:before,
+    .java-code .code-title:before,
+    .cpp-code .code-title:before,
+    .csharp-code .code-title:before,
+    .go-code .code-title:before,
+    .ruby-code .code-title:before,
+    .php-code .code-title:before,
+    .rust-code .code-title:before,
+    .html-code .code-title:before,
+    .css-code .code-title:before {
+      content: '';
+      display: inline-block;
+      width: 0.8em;
+      height: 0.8em;
+      border-radius: 50%;
+      margin-right: 0.5em;
+      vertical-align: -0.05em;
     }
-
-    /* Task list items */
-    li.task-list-item {
-      list-style-type: none;
-      padding-left: 2em !important;
+    
+    .typescript-code .code-title:before { background-color: #3178c6; }
+    .javascript-code .code-title:before { background-color: #f7df1e; }
+    .python-code .code-title:before { background-color: #3776ab; }
+    .java-code .code-title:before { background-color: #b07219; }
+    .cpp-code .code-title:before { background-color: #f34b7d; }
+    .csharp-code .code-title:before { background-color: #178600; }
+    .go-code .code-title:before { background-color: #00ADD8; }
+    .ruby-code .code-title:before { background-color: #CC342D; }
+    .php-code .code-title:before { background-color: #4F5D95; }
+    .rust-code .code-title:before { background-color: #DEA584; }
+    .html-code .code-title:before { background-color: #e34c26; }
+    .css-code .code-title:before { background-color: #563d7c; }
+    
+    /* Rest of the styles */
+    /* Blockquotes */
+    blockquote {
+      border-left: 3px solid ${theme.accentColor};
+      padding: 0.5em 0.8em;
+      margin: 1em 0;
+      color: ${theme.blockquoteColor};
+      font-style: italic;
+      font-size: 8pt;
+      background-color: ${theme.backgroundColor === '#FFFFFF' ? 'rgba(241, 245, 249, 0.5)' : 'rgba(30, 41, 59, 0.5)'};
+      border-radius: 0 4px 4px 0;
+      page-break-inside: avoid;
     }
-
-    li.task-list-item::before {
-      content: none !important;
+    
+    /* Lists - Enhanced styling */
+    ul, ol {
+      padding-left: 2em;
+      margin: 0.6em 0 0.9em;
     }
-
-    .task-list-item input[type="checkbox"] {
+    
+    li {
+      margin-bottom: 0.42em;
+      page-break-inside: avoid;
+      word-wrap: normal;
+      overflow-wrap: normal;
+      word-break: keep-all; /* Avoid breaking inside words */
+      position: relative;
+      line-height: 1.4;
+    }
+    
+    /* Unordered lists with custom bullets */
+    ul {
+      list-style: none;
+    }
+    
+    ul > li {
+      position: relative;
+      padding-left: 0.3em;
+    }
+    
+    ul > li::before {
+      content: "";
       position: absolute;
-      left: 0;
-      margin: 0.25em 0 0 0;
-      vertical-align: middle;
+      left: -1.2em;
+      top: 0.5em;
+      width: 0.5em;
+      height: 0.5em;
+      background-color: ${theme.accentColor};
+      border-radius: 50%;
     }
-
-    /* Ensure proper spacing between list items */
-    ul.balanced-list > li:not(:last-child),
-    ol.balanced-list > li:not(:last-child) {
-      margin-bottom: 0.5em;
+    
+    /* Nested unordered lists with different bullet styles */
+    ul ul > li::before {
+      background-color: transparent;
+      border: 1px solid ${theme.accentColor};
+      width: 0.4em;
+      height: 0.4em;
     }
-
-    /* Ensure proper spacing for paragraphs inside list items */
-    ul.balanced-list li p:first-child,
-    ol.balanced-list li p:first-child {
-      margin-top: 0;
+    
+    ul ul ul > li::before {
+      border-radius: 0;
+      background-color: transparent;
+      border: 1px solid ${theme.accentColor};
+      transform: rotate(45deg);
+      width: 0.35em;
+      height: 0.35em;
     }
-
-    ul.balanced-list li p:last-child,
-    ol.balanced-list li p:last-child {
-      margin-bottom: 0;
+    
+    /* Enhanced ordered lists with proper nesting */
+    ol {
+      list-style: none;
+      margin: 0.6em 0 0.9em;
+      padding-left: 2.2em;
+      counter-reset: section;
     }
-
-    /* Parent list styling enhancements */
-    .parent-list {
-      margin-top: 0.8em;
-      margin-bottom: 1em;
+    
+    ol > li {
+      counter-increment: section;
+      padding-left: 0.5em;
+      position: relative;
+    }
+    
+    ol > li::before {
+      content: counter(section) ".";
+      position: absolute;
+      left: -2em;
+      width: 1.8em;
+      text-align: right;
+      color: ${theme.headingColor};
+      font-weight: 500;
+    }
+    
+    /* Second level - use letters */
+    ol ol {
+      counter-reset: subsection;
+    }
+    
+    ol ol > li {
+      counter-increment: subsection;
+    }
+    
+    ol ol > li::before {
+      content: counter(section) "." counter(subsection);
+    }
+    
+    /* Third level - use roman numerals */
+    ol ol ol {
+      counter-reset: subsubsection;
+    }
+    
+    ol ol ol > li {
+      counter-increment: subsubsection;
+    }
+    
+    ol ol ol > li::before {
+      content: counter(section) "." counter(subsection) "." counter(subsubsection);
+    }
+    
+    /* List spacing refinements */
+    ul, ol {
+      padding-bottom: 0.2em; /* Add space after lists */
+    }
+    
+    li > ul, li > ol {
+      margin-top: 0.3em;
+      margin-bottom: 0.2em;
+      margin-left: 0.5em; /* Add indentation for nested lists */
+    }
+    
+    /* Add visual indicator for list items with subitems */
+    li:has(> ul), li:has(> ol) {
+      margin-bottom: 0.4em;
     }
     
     /* Add subtle connecting lines for nested lists */
@@ -780,9 +860,88 @@ function generateStyledHtml(htmlContent, theme, paperSize) {
       position: relative;
       border-left: 1px dashed ${theme === darkTheme ? 'rgba(96, 165, 250, 0.2)' : 'rgba(59, 130, 246, 0.15)'};
       margin-left: -0.5em;
-      padding-left: 1.5em;
+      padding-left: 1.8em;
     }
     
+    /* Balanced spacing between list items */
+    .balanced-list > li:not(:last-child) {
+      margin-bottom: 0.5em;
+    }
+    
+    /* Make list markers stand out slightly on hover for interactive PDFs */
+    @media not print {
+      ul > li:hover::before {
+        transform: scale(1.2);
+      }
+      
+      ol > li:hover::before {
+        font-weight: 600;
+      }
+    }
+    
+    /* Reference list specific styling */
+    .reference-list li {
+      margin-bottom: 0.8em;
+      padding-left: 0.5em;
+    }
+    
+    .reference-list li::before {
+      color: ${theme.accentColor};
+      font-weight: 600;
+    }
+    
+    /* Task lists and checkbox styling */
+    ul li.task-list-item {
+      padding-left: 1.8em;
+      position: relative;
+    }
+    
+    ul li.task-list-item::before {
+      display: none; /* Hide the default bullet */
+    }
+    
+    ul li.task-list-item input[type="checkbox"] {
+      position: absolute;
+      left: -1.5em;
+      top: 0.25em;
+      width: 1.1em;
+      height: 1.1em;
+      margin: 0;
+      vertical-align: middle;
+      appearance: none;
+      -webkit-appearance: none;
+      border: 1px solid ${theme.borderColor};
+      border-radius: 3px;
+      background-color: ${theme === darkTheme ? '#1E293B' : '#FFFFFF'};
+    }
+    
+    ul li.task-list-item input[type="checkbox"]:checked {
+      background-color: ${theme.accentColor};
+      border-color: ${theme.accentColor};
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z'/%3E%3C/svg%3E");
+      background-size: 0.8em;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    
+    /* Task completion indicators */
+    .task-complete {
+      color: ${theme.accentColor};
+      font-weight: bold;
+      margin-right: 0.3em;
+    }
+    
+    .task-incomplete {
+      color: ${theme.blockquoteColor};
+      margin-right: 0.3em;
+    }
+    
+    /* Parent list styling enhancements */
+    .parent-list {
+      margin-top: 0.8em;
+      margin-bottom: 1em;
+    }
+
     /* Tables */
     table {
       width: 100%;
@@ -791,7 +950,7 @@ function generateStyledHtml(htmlContent, theme, paperSize) {
       font-size: 8pt;
       table-layout: fixed; /* Use fixed layout for better column control */
     }
-    
+
     th {
       background-color: ${theme.tableHeaderBg};
       text-align: left;
@@ -803,7 +962,7 @@ function generateStyledHtml(htmlContent, theme, paperSize) {
       word-wrap: break-word;
       hyphens: auto;
     }
-    
+
     td {
       padding: 0.5em 0.6em;
       border: 1px solid ${theme.borderColor};
@@ -885,7 +1044,7 @@ function generateStyledHtml(htmlContent, theme, paperSize) {
       display: block;
       visibility: hidden;
     }
-    
+
     .page-break-after {
       page-break-after: always;
       break-after: page;
@@ -896,7 +1055,7 @@ function generateStyledHtml(htmlContent, theme, paperSize) {
       display: block;
       visibility: hidden;
     }
-    
+
     /* Position tracker for page breaks */
     .position-tracker {
       height: 0;
@@ -905,7 +1064,7 @@ function generateStyledHtml(htmlContent, theme, paperSize) {
       padding: 0;
       border: none;
     }
-    
+
     /* Footnotes styling */
     .footnotes {
       margin-top: 2em;
@@ -915,57 +1074,57 @@ function generateStyledHtml(htmlContent, theme, paperSize) {
       page-break-before: always;
       break-before: page;
     }
-    
+
     .footnotes hr {
       display: none;
     }
-    
+
     .footnote-ref {
       font-size: 0.75em;
       vertical-align: super;
       line-height: 0;
       margin: 0 0.15em;
     }
-    
+
     .footnote-ref a {
       color: ${theme.linkColor};
       text-decoration: none;
       padding: 0 0.2em;
     }
-    
+
     .footnote-item {
       font-size: 8pt;
       margin-bottom: 0.5em;
       position: relative;
       color: ${theme.textColor};
     }
-    
+
     .footnote-list {
       padding-left: 1.5em;
       list-style-type: none; /* Remove automatic numbering */
     }
-    
+
     .footnote-list li {
       position: relative;
       padding-left: 1em;
       text-indent: -1em;
       margin-bottom: 0.6em;
     }
-    
+
     .footnote-list li::before {
       content: attr(data-number) ".";
       color: ${theme.accentColor};
       font-weight: 600;
       margin-right: 0.5em;
     }
-    
+
     .footnote-backref {
       color: ${theme.linkColor};
       text-decoration: none;
       font-size: 0.85em;
       margin-left: 0.3em;
     }
-    
+
     .footnote-backref:hover {
       text-decoration: underline;
     }
@@ -1059,58 +1218,75 @@ renderer.code = function(tokenOrCode, infoStringOrLang, escaped) {
   let title = '';
   let isToken = false;
 
-  // Handle both string and token inputs
   if (typeof tokenOrCode === 'object' && tokenOrCode !== null && tokenOrCode.text !== undefined) {
     isToken = true;
     const token = tokenOrCode;
     codeText = token.text || '';
     language = (token.lang || '').trim().toLowerCase();
-    const actualInfoString = typeof infoStringOrLang === 'string' ? infoStringOrLang : (token.params || '');
+    const actualInfoString = typeof infoStringOrLang === 'string' ? infoStringOrLang : (token.params || ''); // token.params for fenced code attributes
+    
+    console.log(`[renderer.code] Received TOKEN. text (len: ${codeText.length}): "${codeText.substring(0,70).replace(/\n/g, '\\n')}...", token.lang: "${language}", full infoString/params: "${actualInfoString}"`);
 
     if (actualInfoString) {
       const parts = actualInfoString.split(':');
       const langFromInfo = parts[0].trim().toLowerCase();
-      if (!language && langFromInfo) {
+      if (!language && langFromInfo) { // If token.lang was empty, use from info string
         language = langFromInfo;
+      } else if (language && langFromInfo && language !== langFromInfo) {
+        // This case might indicate language in ```lang and lang:title mismatch. Prioritize token.lang.
+        console.warn(`[renderer.code] Mismatch: token.lang ("${language}") vs infoString lang ("${langFromInfo}"). Using token.lang.`);
       }
       if (parts.length > 1) {
         title = parts.slice(1).join(':').trim();
+      } else if (!language && !title && langFromInfo) { 
+        // If no colon, and language still not set, the whole string might be the language
+        language = langFromInfo;
       }
     }
+  } else if (typeof tokenOrCode === 'string') {
+    codeText = tokenOrCode;
+    const langFromInfo = typeof infoStringOrLang === 'string' ? infoStringOrLang : '';
+    // For indented code, the entire infoStringOrLang is the language, no title parsing.
+    language = langFromInfo.trim().toLowerCase();
+    console.log(`[renderer.code] Received STRING code. text (len: ${codeText.length}): "${codeText.substring(0,70).replace(/\n/g, '\\n')}...", lang from infostring: "${language}"`);
   } else {
-    codeText = String(tokenOrCode || '');
-    language = (infoStringOrLang || '').trim().toLowerCase();
+    console.error('[renderer.code] Received UNEXPECTED type for code arg:', tokenOrCode);
+    // Fallback to prevent error, but this should be investigated if it occurs
+    codeText = String(tokenOrCode || ''); 
+    language = '';
+  }
+  
+  language = language || ''; // Ensure language is always a string
+
+  console.log(`[renderer.code] FINAlIZED for highlight: lang="${language}", title="${title}", code (len: ${codeText.length}): "${codeText.substring(0,70).replace(/\n/g, '\\n')}..."`);
+
+  // Use the highlight function provided in marked's options.
+  // this.options.highlight will call our safeHighlight via the setup in marked.setOptions.
+  const highlightedCode = this.options.highlight ? this.options.highlight(codeText, language) : escapeHtml(codeText);
+  // `highlightedCode` is now HTML (if highlighting worked) or an HTML-escaped string.
+  
+  console.log(`[renderer.code] Output from highlight fn (len: ${highlightedCode.length}): "${highlightedCode.substring(0, 70).replace(/\n/g, '\\n')}..."`);
+
+  let titleDisplayString = '';
+  const escapedLang = language && language.toLowerCase() !== 'none' && language.trim() !== '' ? escapeHtml(language) : '';
+  const escapedTitle = title ? escapeHtml(title) : '';
+
+  if (escapedTitle && escapedLang) {
+    titleDisplayString = `${escapedTitle} (${escapedLang})`;
+  } else if (escapedTitle) {
+    titleDisplayString = escapedTitle;
+  } else if (escapedLang) {
+    titleDisplayString = escapedLang;
   }
 
-  // Special handling for shell/bash commands
-  if (language === 'bash' || language === 'shell') {
-    // Add $ prefix to lines that don't have it and aren't continuations
-    codeText = codeText.split('\n').map(line => {
-      const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith('$') && !trimmed.startsWith('#')) {
-        return '$ ' + line;
-      }
-      return line;
-    }).join('\n');
-  }
+  const titleHtml = titleDisplayString ? `<div class="code-title">${titleDisplayString}</div>` : '';
+  // Use language-xxx class convention for highlight.js themes
+  const langClassForTheme = language ? `language-${escapeHtml(language)}` : 'language-none'; 
+  const specificBlockClass = language ? `${escapeHtml(language)}-code` : ''; // For existing specific lang styles e.g. .typescript-code
 
-  // Ensure we have valid strings
-  codeText = String(codeText || '');
-  language = String(language || '');
-
-  // Highlight the code
-  const highlightedCode = this.options.highlight ? 
-    this.options.highlight(codeText, language) : 
-    escapeHtml(codeText);
-
-  // Build the HTML
-  const titleHtml = title ? `<div class="code-title">${escapeHtml(title)}</div>` : '';
-  const langClass = language ? `language-${escapeHtml(language)}` : '';
-  const blockClass = language ? `${escapeHtml(language)}-code` : '';
-
-  return `<div class="code-block ${blockClass}">
+  return `<div class="code-block ${specificBlockClass}">
     ${titleHtml}
-    <pre><code class="${langClass}">${highlightedCode}</code></pre>
+    <pre><code class="${langClassForTheme}">${highlightedCode}</code></pre>
   </div>`;
 };
 
@@ -1142,59 +1318,59 @@ renderer.listitem = function(text, task, checked) {
   return `<li>${text}</li>`;
 };
 
-// Enhanced list processing
+// Add after renderer.listitem definition
 renderer.list = function(body, ordered, start) {
-  const type = ordered ? 'ol' : 'ul';
-  const startAttr = ordered && start !== 1 ? ` start="${start}"` : '';
-  const className = 'balanced-list' + (ordered ? ' ordered-list' : '');
-  
-  // Process the body to ensure proper nesting and spacing
-  let processedBody = '';
-  if (typeof body === 'object' && body !== null) {
-    // Handle token-based input (marked v9+)
-    if (Array.isArray(body.items)) {
-      processedBody = body.items.map(item => {
+  let listBody = '';
+  let isOrdered = false;
+  let startVal = 1;
+
+  if (arguments.length === 1 && typeof body === 'object' && body !== null) {
+    const token = body;
+    isOrdered = !!token.ordered;
+    startVal = typeof token.start === 'number' ? token.start : 1;
+
+    if (Array.isArray(token.items)) {
+      listBody = token.items.map(it => {
         let itemHtml = '';
-        if (this.parser && item.tokens) {
+        if (this.parser && it && it.tokens) {
+          // Safely parse the tokens for this list item into HTML
           try {
-            itemHtml = this.parser.parse(item.tokens);
+            itemHtml = this.parser.parse(it.tokens);
           } catch (e) {
-            itemHtml = item.text || '';
+            // Fallback to raw text if parsing fails
+            itemHtml = it.text || '';
           }
         } else {
-          itemHtml = item.text || '';
+          itemHtml = it.text || '';
         }
         return `<li>${itemHtml}</li>`;
       }).join('\n');
-    } else {
-      processedBody = String(body || '');
     }
   } else {
-    processedBody = String(body || '');
+    listBody = typeof body === 'string' ? body : '';
+    isOrdered = !!ordered;
+    startVal = typeof start === 'number' ? start : 1;
   }
 
-  return `<${type} class="${className}"${startAttr}>\n${processedBody}\n</${type}>`;
+  const tag = isOrdered ? 'ol' : 'ul';
+  const startAttr = isOrdered && startVal > 1 ? ` start="${startVal}"` : '';
+  return `<${tag} class="balanced-list"${startAttr}>\n${listBody}\n</${tag}>`;
 };
 
 // Configure marked with our custom renderer
 marked.setOptions({
   renderer: renderer,
   highlight: function(code, lang) {
+    // This function is called by renderer.code (via this.options.highlight)
+    // and by marked itself for non-fenced code blocks if a lang is provided.
     const language = (lang || '').trim().toLowerCase();
-    if (!language) return escapeHtml(code);
-    
-    try {
-      return hljs.highlight(code, { 
-        language,
-        ignoreIllegals: true 
-      }).value;
-    } catch (err) {
-      console.warn(`Failed to highlight code block: ${err.message}`);
-      return escapeHtml(code);
-    }
+    // Ensure code is a string before logging/processing
+    const codeStr = String(code || '');
+    console.log(`[marked.options.highlight] Called with lang: "${language}", code (len: ${codeStr.length}): "${codeStr.substring(0,70).replace(/\n/g, '\\n')}..."`);
+    return safeHighlight(codeStr, language); // Pass to our main highlighter
   },
   gfm: true,
-  breaks: true, // Enable line breaks
+  breaks: false,
   pedantic: false,
   smartLists: true,
   smartypants: true,
