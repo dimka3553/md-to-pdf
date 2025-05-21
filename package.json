@@ -20,6 +20,8 @@
     "node-fetch": "^2.7.0",
     "pdfkit": "^0.17.1",
     "puppeteer": "^24.9.0",
+    "puppeteer-core": "^24.9.0",
+    "@sparticuz/chromium-min": "^133.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-simplemde-editor": "^5.2.0",
