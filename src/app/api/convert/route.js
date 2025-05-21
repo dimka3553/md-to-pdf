@@ -20,9 +20,11 @@ async function getBrowser() {
   if (process.env.VERCEL) {
     // Vercel production environment
     browser = await puppeteerCore.launch({
-      args: chromium.args,
+      args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
+      defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(remoteExecutablePath),
-      headless: "new",
+      headless: chromium.headless,
+      ignoreHTTPSErrors: true,
     });
   } else {
     // Local development environment

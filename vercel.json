@@ -1,0 +1,11 @@
+{
+    "functions": {
+        "app/api/convert/route.js": {
+            "memory": 3008,
+            "maxDuration": 60
+        }
+    },
+    "env": {
+        "VERCEL": "1"
+    }
+}
