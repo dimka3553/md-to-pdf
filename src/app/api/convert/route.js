@@ -1415,14 +1415,13 @@ export async function POST(request) {
     const styledHtml = generateStyledHtml(html, theme, paperSize);
 
     try {
-      // Always launch puppeteer-core with the minimal Chromium build (optimised for Vercel).
       const executablePath = await chromium.executablePath(
         'https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar'
       );
 
       const browser = await puppeteerCore.launch({
         executablePath,
-        args: chromium.args,
+        args: [...chromium.args, '--no-sandbox'],
         headless: chromium.headless,
         defaultViewport: chromium.defaultViewport,
       }).catch(err => {
@@ -1433,20 +1432,17 @@ export async function POST(request) {
           Details: ${err.stack}`);
       });
 
-      // Create a new page
       const page = await browser.newPage();
       
-      // Set viewport and other configurations
       await page.setViewport({
-        width: paperSize === 'A4' ? 794 : 1087,  // A4 or Letter width in pixels at 96 DPI
-        height: 1123,  // A4 height in pixels at 96 DPI
+        width: paperSize === 'A4' ? 794 : 1087,
+        height: 1123,
         deviceScaleFactor: 2,
       });
 
-      // Load the HTML content
       await page.setContent(styledHtml, {
-        waitUntil: 'networkidle0',
-        timeout: 30000 // Longer timeout for image loading
+        waitUntil: ['networkidle0', 'load', 'domcontentloaded'],
+        timeout: 30000
       });
 
       // Add specific handler for image loading
@@ -1562,7 +1558,7 @@ export async function POST(request) {
       // Wait for page break logic to execute
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Generate PDF
+      // Generate PDF with specific settings
       const pdf = await page.pdf({
         format: paperSize,
         margin: {
@@ -1578,13 +1574,25 @@ export async function POST(request) {
             <span class="pageNumber"></span>
           </div>
         `,
-        printBackground: true
+        printBackground: true,
+        preferCSSPageSize: true,
+        omitBackground: false
       });
 
-      // Don't close the browser, just the page
       await page.close();
-      
-      return NextResponse.json({ pdf: pdf.toString('base64') });
+      await browser.close();
+
+      // Create response with proper headers
+      return new NextResponse(pdf, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Length': pdf.length.toString(),
+          'Content-Disposition': 'attachment; filename="document.pdf"',
+          'Cache-Control': 'no-cache',
+        },
+      });
+
     } catch (browserError) {
       console.error('Browser initialization error:', browserError);
       return NextResponse.json({
@@ -1604,7 +1612,6 @@ export async function POST(request) {
       errno: error.errno
     });
 
-    // Determine the specific error type and provide a helpful message
     let errorMessage = 'An unexpected error occurred during PDF generation.';
     let errorType = 'UNKNOWN_ERROR';
 
