@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import puppeteer from 'puppeteer';
 import puppeteerCore from 'puppeteer-core';
 import chromium from '@sparticuz/chromium-min';
 import { marked } from 'marked';
@@ -1416,39 +1415,17 @@ export async function POST(request) {
     // Create the complete HTML document with custom styling
     const styledHtml = generateStyledHtml(html, theme, paperSize);
 
-    // Decide which puppeteer flavour / chromium binary to use depending on the execution environment.
-    let browser;
+    // Always launch puppeteer-core with the minimal Chromium build (optimised for Vercel).
+    const executablePath = await chromium.executablePath(
+      'https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar'
+    );
 
-    // On Vercel (or any production build) the serverless function size limit makes the full
-    // puppeteer package impractical. We therefore use the light-weight puppeteer-core
-    // together with the minimal Chromium build published by @sparticuz.
-    if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || process.env.VERCEL === '1') {
-      // Fetch the executable path for the v133 build that is compatible with puppeteer v24.
-      const executablePath = await chromium.executablePath(
-        'https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar'
-      );
-
-      browser = await puppeteerCore.launch({
-        executablePath,
-        args: chromium.args,
-        headless: chromium.headless,
-        defaultViewport: chromium.defaultViewport,
-      });
-    } else {
-      // In local development we can rely on the full puppeteer package which downloads a bundled
-      // copy of Chrome automatically.
-      browser = await puppeteer.launch({
-        headless: 'new',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--font-render-hinting=none',
-          '--disable-web-security', // Allow cross-origin images
-          '--allow-file-access-from-files',
-          '--enable-features=NetworkService',
-        ],
-      });
-    }
+    const browser = await puppeteerCore.launch({
+      executablePath,
+      args: chromium.args,
+      headless: chromium.headless,
+      defaultViewport: chromium.defaultViewport,
+    });
     
     const page = await browser.newPage();
     
