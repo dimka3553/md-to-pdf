@@ -1,41 +1,12 @@
-import { NextResponse } from 'next/server';
 import puppeteerCore from 'puppeteer-core';
 import chromium from '@sparticuz/chromium-min';
 import { marked } from 'marked';
 import hljs from 'highlight.js';
 import twemoji from 'twemoji';
+import { NextResponse } from 'next/server';
 
-// Remote Chromium executable path for Vercel
-const remoteExecutablePath = "https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar";
-
-// Browser instance cache
-let browser;
-
-// Get or create browser instance
-async function getBrowser() {
-  if (browser) return browser;
-
-  const isVercelProd = process.env.NEXT_PUBLIC_VERCEL_ENVIRONMENT === "production" || process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
-
-  if (isVercelProd) {
-    // Vercel production environment – configuration aligned with tutorial
-    browser = await puppeteerCore.launch({
-      args: chromium.args,
-      executablePath: await chromium.executablePath(remoteExecutablePath),
-      headless: true,
-    });
-  } else {
-    // Local development environment – configuration aligned with tutorial
-    browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      headless: true,
-    });
-  }
-  return browser;
-}
-
-// Simplify language registration - let highlight.js handle built-in languages
-console.log('Initializing highlight.js version:', hljs.versionString);
+// Remote Chromium executable path for Vercel (matches chromium-min v133)
+const remoteExecutablePath = "https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar";
 
 // Track footnotes globally
 let footnotes = {};
@@ -1443,174 +1414,224 @@ export async function POST(request) {
     // Create the complete HTML document with custom styling
     const styledHtml = generateStyledHtml(html, theme, paperSize);
 
+    try {
+      // Always launch puppeteer-core with the minimal Chromium build (optimised for Vercel).
+      const executablePath = await chromium.executablePath(
+        'https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar'
+      );
 
-    // Always launch puppeteer-core with the minimal Chromium build (optimised for Vercel).
-    const executablePath = await chromium.executablePath(
-      'https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar'
-    );
+      const browser = await puppeteerCore.launch({
+        executablePath,
+        args: chromium.args,
+        headless: chromium.headless,
+        defaultViewport: chromium.defaultViewport,
+      }).catch(err => {
+        throw new Error(`Failed to launch browser: ${err.message}. This might be due to:
+          1. Chromium binary not found or corrupted
+          2. Insufficient permissions to execute Chromium
+          3. System resources (memory/CPU) constraints
+          Details: ${err.stack}`);
+      });
 
-    const browser = await puppeteerCore.launch({
-      executablePath,
-      args: chromium.args,
-      headless: chromium.headless,
-      defaultViewport: chromium.defaultViewport,
-    });
+      // Create a new page
+      const page = await browser.newPage();
+      
+      // Set viewport and other configurations
+      await page.setViewport({
+        width: paperSize === 'A4' ? 794 : 1087,  // A4 or Letter width in pixels at 96 DPI
+        height: 1123,  // A4 height in pixels at 96 DPI
+        deviceScaleFactor: 2,
+      });
 
-    
-    // Create a new page
-    const page = await browser.newPage();
-    
-    // Set viewport and other configurations
-    await page.setViewport({
-      width: paperSize === 'A4' ? 794 : 1087,  // A4 or Letter width in pixels at 96 DPI
-      height: 1123,  // A4 height in pixels at 96 DPI
-      deviceScaleFactor: 2,
-    });
+      // Load the HTML content
+      await page.setContent(styledHtml, {
+        waitUntil: 'networkidle0',
+        timeout: 30000 // Longer timeout for image loading
+      });
 
-    // Load the HTML content
-    await page.setContent(styledHtml, {
-      waitUntil: 'networkidle0',
-      timeout: 30000 // Longer timeout for image loading
-    });
-
-    // Add specific handler for image loading
-    await page.evaluate(async () => {
-      // Helper function to wait for all images
-      const waitForAllImages = async () => {
-        const images = Array.from(document.querySelectorAll('img'));
-        if (images.length === 0) return;
-        
-        await Promise.all(images.map(img => {
-          if (img.complete) return Promise.resolve();
+      // Add specific handler for image loading
+      await page.evaluate(async () => {
+        // Helper function to wait for all images
+        const waitForAllImages = async () => {
+          const images = Array.from(document.querySelectorAll('img'));
+          if (images.length === 0) return;
           
-          return new Promise((resolve) => {
-            img.addEventListener('load', resolve);
-            img.addEventListener('error', () => {
-              // If image fails to load, add placeholder styling
-              img.style.background = '#f0f0f0';
-              img.style.display = 'block';
-              img.style.minHeight = '150px';
-              img.style.minWidth = '150px';
-              img.style.position = 'relative';
-              
-              // Add placeholder text
-              const parent = img.parentNode;
-              const placeholder = document.createElement('div');
-              placeholder.textContent = 'Image unavailable';
-              placeholder.style.position = 'absolute';
-              placeholder.style.top = '50%';
-              placeholder.style.left = '50%';
-              placeholder.style.transform = 'translate(-50%, -50%)';
-              placeholder.style.color = '#666';
-              placeholder.style.fontSize = '14px';
-              parent.style.position = 'relative';
-              parent.appendChild(placeholder);
-              
-              resolve();
+          await Promise.all(images.map(img => {
+            if (img.complete) return Promise.resolve();
+            
+            return new Promise((resolve) => {
+              img.addEventListener('load', resolve);
+              img.addEventListener('error', () => {
+                // If image fails to load, add placeholder styling
+                img.style.background = '#f0f0f0';
+                img.style.display = 'block';
+                img.style.minHeight = '150px';
+                img.style.minWidth = '150px';
+                img.style.position = 'relative';
+                
+                // Add placeholder text
+                const parent = img.parentNode;
+                const placeholder = document.createElement('div');
+                placeholder.textContent = 'Image unavailable';
+                placeholder.style.position = 'absolute';
+                placeholder.style.top = '50%';
+                placeholder.style.left = '50%';
+                placeholder.style.transform = 'translate(-50%, -50%)';
+                placeholder.style.color = '#666';
+                placeholder.style.fontSize = '14px';
+                parent.style.position = 'relative';
+                parent.appendChild(placeholder);
+                
+                resolve();
+              });
             });
-          });
-        }));
-      };
-      
-      await waitForAllImages();
-      
-      // Apply smart page break logic after images are loaded
-      // Give time for page to render before applying breaks
-      const PAGE_HEIGHT_PX = 1123; // A4 height in pixels at 96 DPI
-      const TOP_MARGIN_PX = 40;
-      const BOTTOM_MARGIN_PX = 50;
-      const USABLE_PAGE_HEIGHT = PAGE_HEIGHT_PX - TOP_MARGIN_PX - BOTTOM_MARGIN_PX;
-      const BREAK_THRESHOLD = 0.80; // Trigger break only when heading is within the bottom 20% of the usable page height
-      
-      const headings = document.querySelectorAll('.smart-break');
-      let lastBreakPosition = 0;
-      
-      headings.forEach(heading => {
-        const rect = heading.getBoundingClientRect();
-        const absoluteTop = rect.top + window.scrollY;
-        const adjustedPosition = absoluteTop - lastBreakPosition;
-        const positionInPage = (adjustedPosition % USABLE_PAGE_HEIGHT) / USABLE_PAGE_HEIGHT;
-          
-        // Only add a page break if the heading is actually going to be too close to the bottom of the page
-        if (positionInPage > BREAK_THRESHOLD && positionInPage < 0.95) {
-          // Check if there's already content above this heading
-          let previousElement = heading.previousElementSibling;
-          let hasContentBefore = false;
-          
-          // Look for actual content (not just breaks or empty elements)
-          while (previousElement && !hasContentBefore) {
-            // Skip other page break elements or empty divs
-            if (!previousElement.classList.contains('page-break-before') && 
-                !previousElement.classList.contains('position-tracker') &&
-                previousElement.textContent.trim().length > 0) {
-              hasContentBefore = true;
+          }));
+        };
+        
+        await waitForAllImages();
+        
+        // Apply smart page break logic after images are loaded
+        // Give time for page to render before applying breaks
+        const PAGE_HEIGHT_PX = 1123; // A4 height in pixels at 96 DPI
+        const TOP_MARGIN_PX = 40;
+        const BOTTOM_MARGIN_PX = 50;
+        const USABLE_PAGE_HEIGHT = PAGE_HEIGHT_PX - TOP_MARGIN_PX - BOTTOM_MARGIN_PX;
+        const BREAK_THRESHOLD = 0.80; // Trigger break only when heading is within the bottom 20% of the usable page height
+        
+        const headings = document.querySelectorAll('.smart-break');
+        let lastBreakPosition = 0;
+        
+        headings.forEach(heading => {
+          const rect = heading.getBoundingClientRect();
+          const absoluteTop = rect.top + window.scrollY;
+          const adjustedPosition = absoluteTop - lastBreakPosition;
+          const positionInPage = (adjustedPosition % USABLE_PAGE_HEIGHT) / USABLE_PAGE_HEIGHT;
+            
+          // Only add a page break if the heading is actually going to be too close to the bottom of the page
+          if (positionInPage > BREAK_THRESHOLD && positionInPage < 0.95) {
+            // Check if there's already content above this heading
+            let previousElement = heading.previousElementSibling;
+            let hasContentBefore = false;
+            
+            // Look for actual content (not just breaks or empty elements)
+            while (previousElement && !hasContentBefore) {
+              // Skip other page break elements or empty divs
+              if (!previousElement.classList.contains('page-break-before') && 
+                  !previousElement.classList.contains('position-tracker') &&
+                  previousElement.textContent.trim().length > 0) {
+                hasContentBefore = true;
+              }
+              previousElement = previousElement.previousElementSibling;
             }
-            previousElement = previousElement.previousElementSibling;
+            
+            // Only add a page break if there's actual content before this heading
+            if (hasContentBefore) {
+              const pageBreak = document.createElement('div');
+              pageBreak.className = 'page-break-before';
+              heading.parentNode.insertBefore(pageBreak, heading);
+              lastBreakPosition = absoluteTop;
+            }
+          }
+        });
+        
+        // Cleanup any consecutive page breaks (which can cause empty pages)
+        const allBreaks = document.querySelectorAll('.page-break-before, .force-page-break');
+        allBreaks.forEach(breakEl => {
+          let nextEl = breakEl.nextElementSibling;
+          // If the next element is also a break, remove the current one
+          if (nextEl && (nextEl.classList.contains('page-break-before') || nextEl.classList.contains('force-page-break'))) {
+            breakEl.parentNode.removeChild(breakEl);
           }
           
-          // Only add a page break if there's actual content before this heading
-          if (hasContentBefore) {
-            const pageBreak = document.createElement('div');
-            pageBreak.className = 'page-break-before';
-            heading.parentNode.insertBefore(pageBreak, heading);
-            lastBreakPosition = absoluteTop;
+          // If there's no content after this break before the end of document, remove it
+          let hasContentAfter = false;
+          while (nextEl) {
+            if (nextEl.textContent.trim().length > 0) {
+              hasContentAfter = true;
+              break;
+            }
+            nextEl = nextEl.nextElementSibling;
           }
-        }
+          
+          if (!hasContentAfter) {
+            breakEl.parentNode.removeChild(breakEl);
+          }
+        });
       });
+
+      // Wait for page break logic to execute
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Generate PDF
+      const pdf = await page.pdf({
+        format: paperSize,
+        margin: {
+          top: '40px',
+          right: '40px',
+          bottom: '50px',
+          left: '40px'
+        },
+        displayHeaderFooter: true,
+        headerTemplate: '<div></div>',
+        footerTemplate: `
+          <div style="width: 100%; font-size: 9px; text-align: center; color: #999; padding: 0 20px; font-family: 'Inter', sans-serif;">
+            <span class="pageNumber"></span>
+          </div>
+        `,
+        printBackground: true
+      });
+
+      // Don't close the browser, just the page
+      await page.close();
       
-      // Cleanup any consecutive page breaks (which can cause empty pages)
-      const allBreaks = document.querySelectorAll('.page-break-before, .force-page-break');
-      allBreaks.forEach(breakEl => {
-        let nextEl = breakEl.nextElementSibling;
-        // If the next element is also a break, remove the current one
-        if (nextEl && (nextEl.classList.contains('page-break-before') || nextEl.classList.contains('force-page-break'))) {
-          breakEl.parentNode.removeChild(breakEl);
-        }
-        
-        // If there's no content after this break before the end of document, remove it
-        let hasContentAfter = false;
-        while (nextEl) {
-          if (nextEl.textContent.trim().length > 0) {
-            hasContentAfter = true;
-            break;
-          }
-          nextEl = nextEl.nextElementSibling;
-        }
-        
-        if (!hasContentAfter) {
-          breakEl.parentNode.removeChild(breakEl);
-        }
-      });
-    });
+      return NextResponse.json({ pdf: pdf.toString('base64') });
+    } catch (browserError) {
+      console.error('Browser initialization error:', browserError);
+      return NextResponse.json({
+        error: 'PDF Generation Failed',
+        details: browserError.message,
+        type: 'BROWSER_INIT_ERROR',
+        timestamp: new Date().toISOString()
+      }, { status: 500 });
+    }
 
-    // Wait for page break logic to execute
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Generate PDF
-    const pdf = await page.pdf({
-      format: paperSize,
-      margin: {
-        top: '40px',
-        right: '40px',
-        bottom: '50px',
-        left: '40px'
-      },
-      displayHeaderFooter: true,
-      headerTemplate: '<div></div>',
-      footerTemplate: `
-        <div style="width: 100%; font-size: 9px; text-align: center; color: #999; padding: 0 20px; font-family: 'Inter', sans-serif;">
-          <span class="pageNumber"></span>
-        </div>
-      `,
-      printBackground: true
-    });
-
-    // Don't close the browser, just the page
-    await page.close();
-    
-    return NextResponse.json({ pdf: pdf.toString('base64') });
   } catch (error) {
-    console.error('PDF generation error:', error);
-    return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
+    console.error('PDF generation error:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      syscall: error.syscall,
+      errno: error.errno
+    });
+
+    // Determine the specific error type and provide a helpful message
+    let errorMessage = 'An unexpected error occurred during PDF generation.';
+    let errorType = 'UNKNOWN_ERROR';
+
+    if (error.code === 'Unknown system error -8') {
+      errorMessage = `Failed to spawn Chromium process. This might be due to:
+        1. Insufficient system permissions
+        2. Memory constraints
+        3. Incompatible Chromium version (currently using v133)
+        4. System resource limitations`;
+      errorType = 'CHROMIUM_SPAWN_ERROR';
+    } else if (error.code === 'ENOENT') {
+      errorMessage = 'Required file or directory not found. Check if Chromium is properly installed.';
+      errorType = 'FILE_NOT_FOUND';
+    } else if (error instanceof SyntaxError) {
+      errorMessage = 'Invalid JSON input received.';
+      errorType = 'INVALID_INPUT';
+    }
+
+    return NextResponse.json({
+      error: errorMessage,
+      type: errorType,
+      details: {
+        originalError: error.message,
+        code: error.code,
+        syscall: error.syscall,
+        timestamp: new Date().toISOString()
+      }
+    }, { status: 500 });
   }
 }
