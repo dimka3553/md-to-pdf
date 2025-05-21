@@ -658,77 +658,117 @@ function generateStyledHtml(htmlContent, theme, paperSize) {
 
     /* Enhanced list styling */
     ul.balanced-list, ol.balanced-list {
-      padding-left: 2em;
+      padding-left: 0;
       margin: 0.8em 0;
-      list-style-position: outside;
+      list-style-type: none;
+      counter-reset: list-counter;
     }
 
     ul.balanced-list li, ol.balanced-list li {
       margin: 0.4em 0;
       line-height: 1.5;
       position: relative;
+      padding-left: 2em;
     }
 
-    ul.balanced-list li::before {
+    /* Unordered list bullets */
+    ul.balanced-list > li::before {
       content: "•";
+      position: absolute;
+      left: 0.5em;
       color: ${theme.accentColor};
       font-weight: bold;
+      display: inline-block;
+      width: 1em;
+      text-align: center;
+    }
+
+    /* Ordered list numbers */
+    ol.balanced-list > li {
+      counter-increment: list-counter;
+    }
+
+    ol.balanced-list > li::before {
+      content: counter(list-counter) ".";
       position: absolute;
-      left: -1.5em;
-    }
-
-    ol.balanced-list {
-      counter-reset: item;
-    }
-
-    ol.balanced-list li {
-      counter-increment: item;
-    }
-
-    ol.balanced-list li::before {
-      content: counter(item) ".";
-      color: ${theme.accentColor};
-      font-weight: bold;
-      position: absolute;
-      left: -2em;
+      left: 0;
       width: 1.5em;
       text-align: right;
+      color: ${theme.accentColor};
+      font-weight: bold;
     }
 
-    /* Nested list styling */
+    /* Nested lists */
     ul.balanced-list ul, ol.balanced-list ol,
     ul.balanced-list ol, ol.balanced-list ul {
-      margin: 0.3em 0 0.3em 1em;
+      margin: 0.3em 0 0.3em 0;
+      padding-left: 0.5em;
+      counter-reset: list-counter;
     }
 
-    /* Task list styling */
-    ul li.task-list-item {
+    /* Nested unordered list bullets */
+    ul.balanced-list ul > li::before {
+      content: "◦";
+    }
+
+    ul.balanced-list ul ul > li::before {
+      content: "▪";
+    }
+
+    /* Nested ordered list numbers */
+    ol.balanced-list ol {
+      counter-reset: nested-counter;
+    }
+
+    ol.balanced-list ol > li {
+      counter-increment: nested-counter;
+    }
+
+    ol.balanced-list ol > li::before {
+      content: counter(list-counter) "." counter(nested-counter) ".";
+      width: 2.5em;
+    }
+
+    /* Indentation for nested items */
+    ul.balanced-list ul li, ol.balanced-list ol li,
+    ul.balanced-list ol li, ol.balanced-list ul li {
+      padding-left: 2.5em;
+    }
+
+    /* Task list items */
+    li.task-list-item {
       list-style-type: none;
-      padding-left: 1.5em;
+      padding-left: 2em !important;
     }
 
-    ul li.task-list-item::before {
-      content: none;
+    li.task-list-item::before {
+      content: none !important;
     }
 
     .task-list-item input[type="checkbox"] {
-      margin-right: 0.5em;
-      margin-left: -1.5em;
+      position: absolute;
+      left: 0;
+      margin: 0.25em 0 0 0;
       vertical-align: middle;
     }
 
-    /* Task completion indicators */
-    .task-complete {
-      color: ${theme.accentColor};
-      font-weight: bold;
-      margin-right: 0.3em;
+    /* Ensure proper spacing between list items */
+    ul.balanced-list > li:not(:last-child),
+    ol.balanced-list > li:not(:last-child) {
+      margin-bottom: 0.5em;
     }
-    
-    .task-incomplete {
-      color: ${theme.blockquoteColor};
-      margin-right: 0.3em;
+
+    /* Ensure proper spacing for paragraphs inside list items */
+    ul.balanced-list li p:first-child,
+    ol.balanced-list li p:first-child {
+      margin-top: 0;
     }
-    
+
+    ul.balanced-list li p:last-child,
+    ol.balanced-list li p:last-child {
+      margin-bottom: 0;
+    }
+
     /* Parent list styling enhancements */
     .parent-list {
       margin-top: 0.8em;
