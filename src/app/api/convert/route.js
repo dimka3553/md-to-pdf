@@ -1,9 +1,38 @@
 import { NextResponse } from 'next/server';
 import puppeteer from 'puppeteer';
+import puppeteerCore from 'puppeteer-core';
+import chromium from '@sparticuz/chromium-min';
 import { marked } from 'marked';
 import hljs from 'highlight.js';
 import twemoji from 'twemoji';
 import path from 'path';
+
+// Remote Chromium executable path for Vercel
+const remoteExecutablePath = "https://github.com/Sparticuz/chromium/releases/download/v123.0.0/chromium-v123.0.0-pack.tar";
+
+// Browser instance cache
+let browser;
+
+// Get or create browser instance
+async function getBrowser() {
+  if (browser) return browser;
+
+  if (process.env.VERCEL) {
+    // Vercel production environment
+    browser = await puppeteerCore.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(remoteExecutablePath),
+      headless: "new",
+    });
+  } else {
+    // Local development environment
+    browser = await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      headless: "new",
+    });
+  }
+  return browser;
+}
 
 // Simplify language registration - let highlight.js handle built-in languages
 console.log('Initializing highlight.js version:', hljs.versionString);
@@ -1365,19 +1394,19 @@ marked.setOptions({
 
 export async function POST(request) {
   try {
-    const requestData = await request.json();
-    const { markdown, theme: themeChoice, paperSize = 'A4' } = requestData;
+    const data = await request.json();
+    const { markdown: markdownContent, theme: selectedTheme = 'light', paperSize = 'A4' } = data;
 
-    if (!markdown) {
+    if (!markdownContent) {
       return NextResponse.json(
         { error: "Markdown content is required" },
         { status: 400 }
       );
     }
 
-         // Reset footnotes for this conversion
-     footnotes = {};
-     footnoteCounter = 0;
+    // Reset footnotes for this conversion
+    footnotes = {};
+    footnoteCounter = 0;
     
     // Process footnotes in markdown text
     // First, collect all footnote definitions
@@ -1386,7 +1415,7 @@ export async function POST(request) {
     
     // First, find all footnote definitions and store them
     let footnoteDefMatch;
-    const processedMarkdown = markdown.replace(footnoteDefRegex, (match, ref, text) => {
+    const processedMarkdown = markdownContent.replace(footnoteDefRegex, (match, ref, text) => {
       footnoteDefinitions[ref] = text.trim();
       return ''; // Remove from the text
     });
@@ -1402,11 +1431,11 @@ export async function POST(request) {
     });
 
     // Select theme based on user choice
-    const theme = themeChoice === 'dark' ? darkTheme : lightTheme;
+    const theme = selectedTheme === 'dark' ? darkTheme : lightTheme;
 
     // Process markdown to HTML
-    console.log('[POST] Original Markdown (first 200 chars):', markdown.substring(0,200) + (markdown.length > 200 ? "..." : ""));
-    let html = marked.parse(processedWithReferences || markdown);
+    console.log('[POST] Original Markdown (first 200 chars):', markdownContent.substring(0,200) + (markdownContent.length > 200 ? "..." : ""));
+    let html = marked.parse(processedWithReferences || markdownContent);
     console.log('[POST] HTML after marked.parse (first 500 chars):', html.substring(0,500) + (html.length > 500 ? "..." : ""));
     html = processHtml(html);
     console.log('[POST] HTML after processHtml (first 500 chars):', html.substring(0,500) + (html.length > 500 ? "..." : ""));
@@ -1414,34 +1443,19 @@ export async function POST(request) {
     // Create the complete HTML document with custom styling
     const styledHtml = generateStyledHtml(html, theme, paperSize);
 
-    // Launch Puppeteer to generate PDF
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--font-render-hinting=none',
-        '--disable-web-security', // Allow cross-origin images
-        '--allow-file-access-from-files',
-        '--enable-features=NetworkService'
-      ]
-    });
+    // Get the browser instance using our new getBrowser function
+    const browser = await getBrowser();
     
+    // Create a new page
     const page = await browser.newPage();
     
-    // Set extra HTTP headers for image loading
-    await page.setExtraHTTPHeaders({
-      'Accept-Language': 'en-US,en;q=0.9',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    });
-    
-    // Set viewport for better quality
+    // Set viewport and other configurations
     await page.setViewport({
-      width: 1200,
-      height: 800,
-      deviceScaleFactor: 2
+      width: paperSize === 'A4' ? 794 : 1087,  // A4 or Letter width in pixels at 96 DPI
+      height: 1123,  // A4 height in pixels at 96 DPI
+      deviceScaleFactor: 2,
     });
-    
+
     // Load the HTML content
     await page.setContent(styledHtml, {
       waitUntil: 'networkidle0',
@@ -1580,21 +1594,12 @@ export async function POST(request) {
       printBackground: true
     });
 
-    await browser.close();
-
-    // Return the PDF as binary data
-    return new NextResponse(pdf, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': 'attachment; filename="document.pdf"'
-      }
-    });
+    // Don't close the browser, just the page
+    await page.close();
+    
+    return NextResponse.json({ pdf: pdf.toString('base64') });
   } catch (error) {
-    console.error("Error generating PDF:", error);
-    return NextResponse.json(
-      { error: `Failed to generate PDF: ${error.message}` },
-      { status: 500 }
-    );
+    console.error('PDF generation error:', error);
+    return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
   }
 }
