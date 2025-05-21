@@ -28,6 +28,10 @@
     "twemoji": "^14.0.2",
     "uuid": "^11.1.0"
   },
+  "overrides": {
+    "puppeteer": "^21.9.0",
+    "puppeteer-core": "^21.9.0"
+  },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4.1.7",
