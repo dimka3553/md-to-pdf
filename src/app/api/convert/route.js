@@ -16,7 +16,9 @@ let browser;
 async function getBrowser() {
   if (browser) return browser;
 
-  if (process.env.NEXT_PUBLIC_VERCEL_ENVIRONMENT === "production") {
+  const isVercelProd = process.env.NEXT_PUBLIC_VERCEL_ENVIRONMENT === "production" || process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+
+  if (isVercelProd) {
     // Vercel production environment – configuration aligned with tutorial
     browser = await puppeteerCore.launch({
       args: chromium.args,
