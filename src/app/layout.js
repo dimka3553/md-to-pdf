@@ -51,16 +51,19 @@ export const metadata = {
   },
   icons: {
     icon: [
-      { url: '/logo.png', sizes: '32x32', type: 'image/png' },
-      { url: '/logo.png', sizes: '16x16', type: 'image/png' }
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/favicon-512x512.png', sizes: '512x512', type: 'image/png' }
     ],
     apple: [
-      { url: '/logo.png', sizes: '180x180', type: 'image/png' },
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
     other: [
       {
         rel: 'mask-icon',
-        url: '/logo.png',
+        url: '/safari-pinned-tab.svg',
         color: '#ff0000',
       }
     ]
@@ -77,7 +80,7 @@ export const metadata = {
     },
   },
   verification: {
-    google: 'your-google-verification-code', // You'll need to replace this with your actual verification code
+    google: 'your-google-verification-code',
   },
 };
 
@@ -85,9 +88,22 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        <link rel="icon" href="/logo.png" sizes="any" />
-        <link rel="apple-touch-icon" href="/logo.png" />
+        {/* Standard favicon */}
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        {/* PNG favicons */}
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512x512.png" />
+        {/* Apple Touch Icon */}
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        {/* Safari Pinned Tab */}
+        <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#ff0000" />
+        {/* Web Manifest */}
         <link rel="manifest" href="/manifest.json" />
+        {/* Microsoft Tile Color */}
+        <meta name="msapplication-TileColor" content="#ff0000" />
+        <meta name="theme-color" content="#ffffff" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
