@@ -1,2 +1,3 @@
 # md-to-pdf
-Converts Markdown to PDFs. 
+
+Converts Markdown to PDFs.
