@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import puppeteer from 'puppeteer';
 import puppeteerCore from 'puppeteer-core';
 import chromium from '@sparticuz/chromium-min';
 import { marked } from 'marked';
@@ -1444,8 +1443,19 @@ export async function POST(request) {
     // Create the complete HTML document with custom styling
     const styledHtml = generateStyledHtml(html, theme, paperSize);
 
-    // Get the browser instance using our new getBrowser function
-    const browser = await getBrowser();
+
+    // Always launch puppeteer-core with the minimal Chromium build (optimised for Vercel).
+    const executablePath = await chromium.executablePath(
+      'https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar'
+    );
+
+    const browser = await puppeteerCore.launch({
+      executablePath,
+      args: chromium.args,
+      headless: chromium.headless,
+      defaultViewport: chromium.defaultViewport,
+    });
+
     
     // Create a new page
     const page = await browser.newPage();
