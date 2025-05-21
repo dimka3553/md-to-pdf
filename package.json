@@ -14,7 +14,6 @@
     "easymde": "^2.20.0",
     "fs-extra": "^11.3.0",
     "highlight.js": "^11.11.1",
-    "html-pdf-node": "^1.0.8",
     "marked": "^15.0.12",
     "mermaid": "^10.9.3",
     "next": "15.3.2",
