@@ -5,7 +5,6 @@ import chromium from '@sparticuz/chromium-min';
 import { marked } from 'marked';
 import hljs from 'highlight.js';
 import twemoji from 'twemoji';
-import path from 'path';
 
 // Remote Chromium executable path for Vercel
 const remoteExecutablePath = "https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar";
