@@ -18,15 +18,28 @@ async function getBrowser() {
   if (browser) return browser;
 
   if (process.env.NEXT_PUBLIC_VERCEL_ENVIRONMENT === "production") {
+    // Vercel production environment
     browser = await puppeteerCore.launch({
-      args: chromium.args,
+      args: [
+        ...chromium.args,
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-extensions'
+      ],
       executablePath: await chromium.executablePath(remoteExecutablePath),
       headless: true,
+      ignoreHTTPSErrors: true
     });
   } else {
+    // Local development environment
     browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      headless: true,
+      headless: true
     });
   }
   return browser;

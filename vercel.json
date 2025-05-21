@@ -1,0 +1,8 @@
+{
+    "functions": {
+        "src/app/api/convert/route.js": {
+            "memory": 1000,
+            "maxDuration": 60
+        }
+    }
+}
