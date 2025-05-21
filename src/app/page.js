@@ -31,63 +31,59 @@ try {
 export default function Home() {
   const [markdown, setMarkdown] = useState(`# 🌌 PROTOCOL-X
 
-### Transforming Inputs into Outputs
-
+### Transforming Inputs into Outputs  
 _"Structure. Style. Substance."_
-
-**A demonstration of Markdown features and PDF-ready formatting**
 
 ---
 
 > **🚀 TL;DR**  
-> This example document showcases **all major Markdown elements**—headings, lists, tables, code, images, links, footnotes, blockquotes, and more—organized into a clean, PDF-friendly structure.
+> This template shows **every major Markdown element** in action—and highlights how our free, universal Markdown-to-PDF converter transforms your notes, ChatGPT responses, and documentation into **beautiful, device-agnostic PDFs** that look great on phones, tablets, and desktops alike.
 
 ---
 
 ## 📑 Table of Contents
-1. [Abstract](#abstract)
-2. [Context & Motivation](#1-context--motivation)
-3. [Design & Implementation](#2-design--implementation)
-4. [Feature Showcase](#3-feature-showcase)
-   1. [Text Formatting](#31-text-formatting)
-   2. [Lists](#32-lists)
-   3. [Tables](#33-tables)
-   4. [Code Blocks](#34-code-blocks)
-   5. [Blockquotes & Alerts](#35-blockquotes--alerts)
-   6. [Images & Figures](#36-images--figures)
-5. [Example Diagram](#4-example-diagram)
-6. [Conclusion](#5-conclusion)
-7. [References](#6-references)
-8. [Footnotes](#7-footnotes)
+1. [Abstract](#abstract)  
+2. [Context & Motivation](#1-context--motivation)  
+3. [Design & Implementation](#2-design--implementation)  
+4. [Feature Showcase](#3-feature-showcase)  
+   1. [Text Formatting](#31-text-formatting)  
+   2. [Lists](#32-lists)  
+   3. [Tables](#33-tables)  
+   4. [Code Blocks](#34-code-blocks)  
+   5. [Blockquotes & Alerts](#35-blockquotes--alerts)  
+   6. [Images & Figures](#36-images--figures)  
+5. [Example Diagram](#4-example-diagram)  
+6. [Conclusion](#5-conclusion)  
+7. [References](#6-references)  
+8. [Footnotes](#7-footnotes)  
 
 ---
 
 ## Abstract
 
-This document illustrates **how to structure** a Markdown file for conversion to PDF, including:
+Our **free** Markdown-to-PDF converter lets you take any Markdown file—including ChatGPT outputs—and turn it into a **pixel-perfect PDF** that:
 
-- Hierarchical headings
-- Inline and block-level elements
-- Rich media embedding
-- Cross-references and footnotes
+- Retains all formatting (headings, lists, tables, code, images, footnotes…)  
+- Scales flawlessly on **phones, tablets, and desktops**  
+- Requires no proprietary software or licenses  
 
-By following this template, you can ensure your Markdown-to-PDF workflow produces professional, publication-quality output.
+Whether you're sharing with colleagues, publishing a report, or archiving notes, you'll avoid the common pitfalls of Google Docs pastes and get **consistently beautiful results** every time.
 
 ---
 
 ## 1. Context & Motivation
 
-In many documentation workflows, authors struggle to remember all Markdown capabilities. This template:
+Anyone who's copied Markdown into Google Docs knows the frustration: heading styles break, code blocks lose indentation, tables won't align, and you end up chasing formatting for longer than you spent writing.  
 
-1. Provides a **comprehensive reference** of Markdown features.
-2. Ensures consistent styling across sections.
-3. Serves as a **starting point** for technical reports, whitepapers, and academic papers.
+> **Pain Point:** You ask ChatGPT for a technical summary, paste it into Docs, and suddenly your carefully crafted **\`inline code\`**, **bullet lists**, and **nested blockquotes** look mangled.
+
+**Solution:** Our converter reads your raw Markdown and outputs a **PDF** that preserves every element exactly as intended—no more manual fixes, no more formatting headaches.
 
 ---
 
 ## 2. Design & Implementation
 
-The document is organized into numbered sections with clear subsections. Links in the Table of Contents facilitate easy navigation. Off-the-shelf Markdown converters (e.g., Pandoc, markdown-pdf) will recognize these elements and generate well-formatted PDFs.
+We organized this document with clear, numbered sections and a hyperlinked Table of Contents so that **Pandoc**, **markdown-pdf**, or any Markdown engine can generate a crisp PDF. The same process applies to **any** Markdown source—blog drafts, lecture notes, meeting recaps, or ChatGPT transcripts.
 
 ---
 
@@ -95,7 +91,7 @@ The document is organized into numbered sections with clear subsections. Links i
 
 ### 3.1 Text Formatting
 
-You can apply **bold**, *italic*, ~~strikethrough~~, and \`inline code\`:
+You can apply **bold**, *italic*, ~~strikethrough~~, and \`inline code\` seamlessly:
 
 > **Note:** Combine styles for emphasis, e.g., ***bold italic***.
 
@@ -103,17 +99,17 @@ You can apply **bold**, *italic*, ~~strikethrough~~, and \`inline code\`:
 
 #### 3.2.1 Unordered List
 
-- Item A
-  - Subitem A.1
-    - ✔️ Task list item
+- Item A  
+  - Subitem A.1  
+    - ✔️ Task list item  
     - ✖️ ~~Completed task~~
 
 #### 3.2.2 Ordered List
 
-1. First step
-2. Second step
-   1. Nested step
-   2. Another nested step
+1. First step  
+2. Second step  
+   1. Nested step  
+   2. Another nested step  
 3. Final step
 
 ### 3.3 Tables
@@ -150,17 +146,17 @@ $ touch README.md
 
 ### 3.5 Blockquotes & Alerts
 
-> **Warning:** Ensure your converter supports all extensions you plan to use!
+> **Warning:** Ensure your converter supports all extensions you plan to use!  
 >
 > > Nested blockquotes are also supported.
 
-> **Tip:** Use horizontal rules for section breaks.
-
----
+> **Tip:** Use horizontal rules for section breaks.  
+> —————
 
 ### 3.6 Images & Figures
 
-![Figure 1: Sample Landscape](https://picsum.photos/600/200)
+![Figure 1: Sample Landscape](https://picsum.photos/600/200)  
+*Figure 1: A placeholder landscape.*
 
 **Figure 2:** Urban skyline.  
 ![Figure 2: Urban Skyline](https://picsum.photos/400/300)
@@ -182,11 +178,13 @@ flowchart TD
 
 ## 5. Conclusion
 
-By leveraging this template, you can create Markdown documents that:
+With our converter, you get a **streamlined**, **professional** PDF output from any Markdown source—no subscriptions, no hidden fees, and no compatibility headaches. Perfect for:
 
-- Are **PDF-ready** with minimal adjustments
-- Include **rich content** for technical and design documentation
-- Maintain a **consistent, professional layout**
+- Sharing ChatGPT outputs with non-technical friends  
+- Distributing polished meeting minutes  
+- Publishing whitepapers, tutorials, and technical docs  
+
+Give it a try and transform your Markdown into **presentation-ready PDFs** in seconds.
 
 ---
 
@@ -199,17 +197,13 @@ By leveraging this template, you can create Markdown documents that:
 
 ## 7. Footnotes
 
-This sentence has a footnote.[^1]
+This sentence has a footnote.[^1]  
+This sentence has a footnote.[^2]  
+This sentence has a footnote.[^3]  
 
-This sentence has a footnote.[^2]
-
-This sentence has a footnote.[^3] 
-
-[^1]: This is the footnote text, demonstrating footnote styling in Markdown.
-
-[^2]: This is the second footnote text, demonstrating footnote styling in Markdown.
-
-[^3]: This is the third footnote text, demonstrating footnote styling in Markdown.
+[^1]: Demonstrates footnote styling in Markdown.  
+[^2]: Shows how multiple footnotes render.  
+[^3]: Footnotes are fully supported in the PDF output.  
 
 ---
 `);
