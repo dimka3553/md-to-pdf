@@ -331,297 +331,318 @@ This sentence has a footnote.[^3]
     return fileName.replace(/\.md$/, '.pdf');
   }, [fileName]);
 
+  // Add structured data for rich results
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Markdown to PDF Converter",
+    "applicationCategory": "WebApplication",
+    "operatingSystem": "Any",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "description": "Free online tool to convert Markdown documents to PDF with support for GitHub Flavored Markdown, syntax highlighting, and custom themes."
+  };
+
   return (
-    <main className={`flex min-h-screen flex-col ${inter.className} ${theme === 'dark' ? 'bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-      {/* Fixed Header/Toolbar */}
-      <header className={`sticky top-0 z-50 w-full ${theme === 'dark' ? 'bg-slate-800 border-b border-slate-700' : 'bg-white border-b border-slate-200'} shadow-md transition-colors duration-300`}>
-        <div className="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center">
-            <h1 className={`text-xl font-bold ${theme === 'dark' ? 'text-blue-400' : 'text-blue-700'}`}>
-              Markdown to PDF
-            </h1>
-          </div>
-          
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={toggleTheme}
-                className={`p-1.5 rounded-md border text-sm shadow-sm transition-colors focus:ring-1 focus:outline-none ${theme === 'dark' ? 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
-                aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
-              >
-                {theme === 'light' ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                )}
-              </button>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
+      <main className={`flex min-h-screen flex-col ${inter.className} ${theme === 'dark' ? 'bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+        {/* Fixed Header/Toolbar */}
+        <header className={`sticky top-0 z-50 w-full ${theme === 'dark' ? 'bg-slate-800 border-b border-slate-700' : 'bg-white border-b border-slate-200'} shadow-md transition-colors duration-300`} role="banner">
+          <div className="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center">
+              <h1 className={`text-xl font-bold ${theme === 'dark' ? 'text-blue-400' : 'text-blue-700'}`}>
+                Markdown to PDF Converter
+              </h1>
             </div>
             
-            <div className="flex items-center gap-2">
-              <button
-                onClick={generatePdf}
-                disabled={isLoading}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 ${isLoading ? (theme === 'dark' ? 'bg-slate-600 text-slate-400 cursor-not-allowed' : 'bg-slate-300 text-slate-500 cursor-not-allowed') : (theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-400/50' : 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-400/50')}`}
-              >
-                {isLoading ? (
-                  <span className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Processing...
-                  </span>
-                ) : 'Generate PDF'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div className="flex flex-1">
-        {/* Left Editor Panel - Adjusted to take full width */}
-        <div className={`flex-1 flex flex-col ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
-          <div className={`p-3 flex items-center justify-between border-b ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <h2 className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
-              Edit Markdown
-            </h2>
-            <div className="flex items-center gap-3">
-              <label className="file-input-button">
-                <input
-                  type="file"
-                  accept=".md,text/markdown"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md cursor-pointer transition-colors ${theme === 'dark' ? 'bg-slate-700 hover:bg-slate-600 text-slate-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  Upload MD
-                </span>
-              </label>
-              {isEditingFileName ? (
-                <input
-                  type="text"
-                  value={fileName}
-                  onChange={handleFileNameChange}
-                  onKeyDown={handleFileNameKeyDown}
-                  onBlur={handleFileNameBlur}
-                  autoFocus
-                  className={`text-xs px-2 py-1 rounded-md outline-none ${theme === 'dark' ? 'bg-slate-700 text-slate-200 border border-slate-600' : 'bg-white text-slate-700 border border-slate-300'}`}
-                />
-              ) : (
-                <span 
-                  onClick={startEditingFileName}
-                  className={`text-xs px-2 py-1 rounded-full cursor-pointer ${theme === 'dark' ? 'bg-slate-700 text-slate-400 hover:text-slate-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                  title="Click to edit filename"
+            <nav className="flex items-center gap-4 flex-wrap" role="navigation" aria-label="Main">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleTheme}
+                  className={`p-1.5 rounded-md border text-sm shadow-sm transition-colors focus:ring-1 focus:outline-none ${theme === 'dark' ? 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
+                  aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
                 >
-                  {fileName}
-                </span>
-              )}
-            </div>
+                  {theme === 'light' ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={generatePdf}
+                  disabled={isLoading}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 ${isLoading ? (theme === 'dark' ? 'bg-slate-600 text-slate-400 cursor-not-allowed' : 'bg-slate-300 text-slate-500 cursor-not-allowed') : (theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-400/50' : 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-400/50')}`}
+                >
+                  {isLoading ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Processing...
+                    </span>
+                  ) : 'Generate PDF'}
+                </button>
+              </div>
+            </nav>
           </div>
-          <div className={`flex-1 overflow-hidden ${theme === 'dark' ? 'markdown-editor-dark themed-editor' : 'markdown-editor-light themed-editor'}`}>
-            <SimpleMDE
-              id="markdown-input"
-              value={markdown}
-              onChange={handleMarkdownChange}
-              options={editorOptions}
-            />
-          </div>
-        </div>
-      </div>
+        </header>
 
-      {/* Error Toast */}
-      {error && (
-        <div className={`fixed bottom-4 right-4 p-3 max-w-xs rounded-lg shadow-lg transition-opacity duration-300 ${theme === 'dark' ? 'bg-red-900/90 text-red-200 border border-red-800' : 'bg-red-50 text-red-800 border border-red-200'}`}>
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className={`h-5 w-5 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
+        {/* Main Content */}
+        <div className="flex flex-1">
+          <section className={`flex-1 flex flex-col ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`} role="main" aria-label="Markdown Editor">
+            <div className={`p-3 flex items-center justify-between border-b ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <h2 className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                Edit Markdown
+              </h2>
+              <div className="flex items-center gap-3">
+                <label className="file-input-button">
+                  <input
+                    type="file"
+                    accept=".md,text/markdown"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md cursor-pointer transition-colors ${theme === 'dark' ? 'bg-slate-700 hover:bg-slate-600 text-slate-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    Upload MD
+                  </span>
+                </label>
+                {isEditingFileName ? (
+                  <input
+                    type="text"
+                    value={fileName}
+                    onChange={handleFileNameChange}
+                    onKeyDown={handleFileNameKeyDown}
+                    onBlur={handleFileNameBlur}
+                    autoFocus
+                    className={`text-xs px-2 py-1 rounded-md outline-none ${theme === 'dark' ? 'bg-slate-700 text-slate-200 border border-slate-600' : 'bg-white text-slate-700 border border-slate-300'}`}
+                  />
+                ) : (
+                  <span 
+                    onClick={startEditingFileName}
+                    className={`text-xs px-2 py-1 rounded-full cursor-pointer ${theme === 'dark' ? 'bg-slate-700 text-slate-400 hover:text-slate-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    title="Click to edit filename"
+                  >
+                    {fileName}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium">{error}</p>
+            <div className={`flex-1 overflow-hidden ${theme === 'dark' ? 'markdown-editor-dark themed-editor' : 'markdown-editor-light themed-editor'}`}>
+              <SimpleMDE
+                id="markdown-input"
+                value={markdown}
+                onChange={handleMarkdownChange}
+                options={editorOptions}
+                aria-label="Markdown editor"
+              />
             </div>
-            <div className="ml-auto pl-3">
-              <button
-                onClick={() => setError(null)}
-                className={`inline-flex rounded-md p-1 focus:outline-none focus:ring-2 focus:ring-offset-2 ${theme === 'dark' ? 'text-red-300 hover:bg-red-800 focus:ring-red-600' : 'text-red-500 hover:bg-red-100 focus:ring-red-600'}`}
-              >
-                <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+          </section>
+        </div>
+
+        {/* Error Toast */}
+        {error && (
+          <div role="alert" aria-live="polite" className={`fixed bottom-4 right-4 p-3 max-w-xs rounded-lg shadow-lg transition-opacity duration-300 ${theme === 'dark' ? 'bg-red-900/90 text-red-200 border border-red-800' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className={`h-5 w-5 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
-              </button>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium">{error}</p>
+              </div>
+              <div className="ml-auto pl-3">
+                <button
+                  onClick={() => setError(null)}
+                  className={`inline-flex rounded-md p-1 focus:outline-none focus:ring-2 focus:ring-offset-2 ${theme === 'dark' ? 'text-red-300 hover:bg-red-800 focus:ring-red-600' : 'text-red-500 hover:bg-red-100 focus:ring-red-600'}`}
+                >
+                  <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      
-      <style jsx global>{`
-        /* Global theme styles */
-        html.light-theme {
-          color-scheme: light;
-        }
-        html.dark-theme {
-          color-scheme: dark;
-          scrollbar-color: #4b5563 #1f2937;
-        }
-        html.dark-theme::-webkit-scrollbar {
-          width: 8px;
-          height: 8px;
-        }
-        html.dark-theme::-webkit-scrollbar-track {
-          background: #0f172a;
-        }
-        html.dark-theme::-webkit-scrollbar-thumb {
-          background-color: #334155;
-          border-radius: 4px;
-          border: 2px solid #0f172a;
-        }
+        )}
+        
+        <style jsx global>{`
+          /* Global theme styles */
+          html.light-theme {
+            color-scheme: light;
+          }
+          html.dark-theme {
+            color-scheme: dark;
+            scrollbar-color: #4b5563 #1f2937;
+          }
+          html.dark-theme::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+          }
+          html.dark-theme::-webkit-scrollbar-track {
+            background: #0f172a;
+          }
+          html.dark-theme::-webkit-scrollbar-thumb {
+            background-color: #334155;
+            border-radius: 4px;
+            border: 2px solid #0f172a;
+          }
 
-        body {
-          transition: background-color 0.3s ease, color 0.3s ease;
-          margin: 0;
-          padding: 0;
-          overflow: visible;
-        }
-        body.light-theme {
-          background-color: #f8fafc;
-          color: #1e293b;
-        }
-        body.dark-theme {
-          background-color: #0f172a;
-          color: #e2e8f0;
-        }
+          body {
+            transition: background-color 0.3s ease, color 0.3s ease;
+            margin: 0;
+            padding: 0;
+            overflow: visible;
+          }
+          body.light-theme {
+            background-color: #f8fafc;
+            color: #1e293b;
+          }
+          body.dark-theme {
+            background-color: #0f172a;
+            color: #e2e8f0;
+          }
 
-        /* Syntax highlighting theme switching */
-        .hljs-light code.hljs {
-          display: block;
-          background: #F8FAFC;
-          color: #334155;
-        }
-        
-        .hljs-dark code.hljs {
-          display: block;
-          background: #1E293B;
-          color: #E2E8F0;
-        }
-        
-        .hljs-dark .hljs-comment,
-        .hljs-dark .hljs-quote {
-          color: #94A3B8;
-        }
-        
-        .hljs-dark .hljs-keyword,
-        .hljs-dark .hljs-selector-tag {
-          color: #60A5FA;
-        }
-        
-        .hljs-dark .hljs-string,
-        .hljs-dark .hljs-attr {
-          color: #86EFAC;
-        }
-        
-        .hljs-dark .hljs-number,
-        .hljs-dark .hljs-literal {
-          color: #F472B6;
-        }
-        
-        .hljs-dark .hljs-title,
-        .hljs-dark .hljs-name {
-          color: #60A5FA;
-        }
-        
-        /* Hide GitHub's light/dark themes when opposites are active */
-        .hljs-light .github-dark {
-          display: none !important;
-        }
-        
-        .hljs-dark .github {
-          display: none !important;
-        }
+          /* Syntax highlighting theme switching */
+          .hljs-light code.hljs {
+            display: block;
+            background: #F8FAFC;
+            color: #334155;
+          }
+          
+          .hljs-dark code.hljs {
+            display: block;
+            background: #1E293B;
+            color: #E2E8F0;
+          }
+          
+          .hljs-dark .hljs-comment,
+          .hljs-dark .hljs-quote {
+            color: #94A3B8;
+          }
+          
+          .hljs-dark .hljs-keyword,
+          .hljs-dark .hljs-selector-tag {
+            color: #60A5FA;
+          }
+          
+          .hljs-dark .hljs-string,
+          .hljs-dark .hljs-attr {
+            color: #86EFAC;
+          }
+          
+          .hljs-dark .hljs-number,
+          .hljs-dark .hljs-literal {
+            color: #F472B6;
+          }
+          
+          .hljs-dark .hljs-title,
+          .hljs-dark .hljs-name {
+            color: #60A5FA;
+          }
+          
+          /* Hide GitHub's light/dark themes when opposites are active */
+          .hljs-light .github-dark {
+            display: none !important;
+          }
+          
+          .hljs-dark .github {
+            display: none !important;
+          }
 
-        /* Make editor take full height */
-        .EasyMDEContainer {
-          display: flex;
-          flex-direction: column;
-          height: 100%;
-        }
-        .EasyMDEContainer .CodeMirror {
-          flex: 1;
-          height: auto !important;
-          border: none !important;
-          border-radius: 0 !important;
-        }
-        .EasyMDEContainer .editor-toolbar {
-          border-left: 0 !important;
-          border-right: 0 !important;
-          border-top: 0 !important;
-        }
+          /* Make editor take full height */
+          .EasyMDEContainer {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+          }
+          .EasyMDEContainer .CodeMirror {
+            flex: 1;
+            height: auto !important;
+            border: none !important;
+            border-radius: 0 !important;
+          }
+          .EasyMDEContainer .editor-toolbar {
+            border-left: 0 !important;
+            border-right: 0 !important;
+            border-top: 0 !important;
+          }
 
-        /* Make simpleMDE full height */
-        .markdown-editor-dark .EasyMDEContainer, 
-        .markdown-editor-light .EasyMDEContainer {
-          height: 100%;
-        }
+          /* Make simpleMDE full height */
+          .markdown-editor-dark .EasyMDEContainer, 
+          .markdown-editor-light .EasyMDEContainer {
+            height: 100%;
+          }
 
-        /* Dark theme */
-        .markdown-editor-dark .EasyMDEContainer .CodeMirror {
-          background-color: #1e293b;
-          color: #cbd5e1;
-        }
-        .markdown-editor-dark .EasyMDEContainer .CodeMirror-cursor {
-          border-left-color: #60a5fa;
-        }
-        .markdown-editor-dark .editor-toolbar {
-          background-color: #1e293b;
-          border-bottom: 1px solid #334155;
-        }
-        .markdown-editor-dark .editor-toolbar > * {
-          color: #94a3b8;
-        }
-        .markdown-editor-dark .editor-toolbar > .active, 
-        .markdown-editor-dark .editor-toolbar > button:hover {
-          background-color: #3b82f6;
-          border-color: #2563eb;
-          color: #ffffff;
-        }
-        .markdown-editor-dark .editor-statusbar {
-          color: #94a3b8;
-          background-color: #1e293b;
-          border-color: #334155;
-        }
+          /* Dark theme */
+          .markdown-editor-dark .EasyMDEContainer .CodeMirror {
+            background-color: #1e293b;
+            color: #cbd5e1;
+          }
+          .markdown-editor-dark .EasyMDEContainer .CodeMirror-cursor {
+            border-left-color: #60a5fa;
+          }
+          .markdown-editor-dark .editor-toolbar {
+            background-color: #1e293b;
+            border-bottom: 1px solid #334155;
+          }
+          .markdown-editor-dark .editor-toolbar > * {
+            color: #94a3b8;
+          }
+          .markdown-editor-dark .editor-toolbar > .active, 
+          .markdown-editor-dark .editor-toolbar > button:hover {
+            background-color: #3b82f6;
+            border-color: #2563eb;
+            color: #ffffff;
+          }
+          .markdown-editor-dark .editor-statusbar {
+            color: #94a3b8;
+            background-color: #1e293b;
+            border-color: #334155;
+          }
 
-        /* Light theme */
-        .markdown-editor-light .EasyMDEContainer .CodeMirror {
-          background-color: #ffffff;
-          color: #334155;
-        }
-        .markdown-editor-light .editor-toolbar {
-          background-color: #ffffff;
-          border-bottom: 1px solid #e2e8f0;
-        }
-        .markdown-editor-light .editor-toolbar > * {
-          color: #475569;
-        }
-        .markdown-editor-light .editor-toolbar > .active, 
-        .markdown-editor-light .editor-toolbar > button:hover {
-          background-color: #2563eb;
-          border-color: #1d4ed8;
-          color: #ffffff;
-        }
-        .markdown-editor-light .editor-statusbar {
-          color: #475569;
-          background-color: #ffffff;
-          border-color: #e2e8f0;
-        }
-      `}</style>
-    </main>
+          /* Light theme */
+          .markdown-editor-light .EasyMDEContainer .CodeMirror {
+            background-color: #ffffff;
+            color: #334155;
+          }
+          .markdown-editor-light .editor-toolbar {
+            background-color: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .markdown-editor-light .editor-toolbar > * {
+            color: #475569;
+          }
+          .markdown-editor-light .editor-toolbar > .active, 
+          .markdown-editor-light .editor-toolbar > button:hover {
+            background-color: #2563eb;
+            border-color: #1d4ed8;
+            color: #ffffff;
+          }
+          .markdown-editor-light .editor-statusbar {
+            color: #475569;
+            background-color: #ffffff;
+            border-color: #e2e8f0;
+          }
+        `}</style>
+      </main>
+    </>
   );
 } 
