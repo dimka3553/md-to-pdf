@@ -8,7 +8,6 @@ import 'highlight.js/styles/github-dark.css'; // Dark theme syntax highlighting
 import { Inter } from 'next/font/google'; // Import Inter font
 import { marked } from 'marked'; // Import for markdown parsing
 import hljs from 'highlight.js'; // For syntax highlighting
-import { useAnalytics } from '@/hooks/useAnalytics';
 
 // Dynamically import SimpleMDE to avoid SSR issues
 const SimpleMDE = dynamic(() => import('react-simplemde-editor'), { ssr: false });
@@ -30,9 +29,6 @@ try {
 }
 
 export default function Home() {
-  // Initialize analytics tracking
-  useAnalytics();
-
   const [markdown, setMarkdown] = useState(`# 🌌 PROTOCOL-X
 
 ### Transforming Inputs into Outputs  
