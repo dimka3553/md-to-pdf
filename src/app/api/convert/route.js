@@ -12,18 +12,6 @@ const remoteExecutablePath = "https://github.com/Sparticuz/chromium/releases/dow
 let footnotes = {};
 let footnoteCounter = 0;
 
-// Add CORS headers helper function
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-// Handle OPTIONS request for CORS
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
-}
-
 // Helper function to safely escape HTML
 function escapeHtml(text) {
   if (text === null || text === undefined) {
@@ -1397,7 +1385,7 @@ export async function POST(request) {
     if (!markdownContent) {
       return NextResponse.json(
         { error: "Markdown content is required" },
-        { status: 400, headers: corsHeaders }
+        { status: 400 }
       );
     }
 
@@ -1608,7 +1596,7 @@ export async function POST(request) {
       await page.close();
       await browser.close();
 
-      // Create response with proper headers including CORS
+      // Create response with proper headers
       return new NextResponse(pdf, {
         status: 200,
         headers: {
@@ -1616,7 +1604,6 @@ export async function POST(request) {
           'Content-Length': pdf.length.toString(),
           'Content-Disposition': 'attachment; filename="document.pdf"',
           'Cache-Control': 'no-cache',
-          ...corsHeaders
         },
       });
 
@@ -1627,7 +1614,7 @@ export async function POST(request) {
         details: browserError.message,
         type: 'BROWSER_INIT_ERROR',
         timestamp: new Date().toISOString()
-      }, { status: 500, headers: corsHeaders });
+      }, { status: 500 });
     }
 
   } catch (error) {
@@ -1666,6 +1653,6 @@ export async function POST(request) {
         syscall: error.syscall,
         timestamp: new Date().toISOString()
       }
-    }, { status: 500, headers: corsHeaders });
+    }, { status: 500 });
   }
 }
