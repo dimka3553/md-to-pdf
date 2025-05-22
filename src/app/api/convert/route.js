@@ -8,6 +8,18 @@ import { NextResponse } from 'next/server';
 // Remote Chromium executable path for Vercel (matches chromium-min v133)
 const remoteExecutablePath = "https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar";
 
+// CORS headers configuration
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// Handle CORS preflight requests
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 // Track footnotes globally
 let footnotes = {};
 let footnoteCounter = 0;
@@ -1385,7 +1397,7 @@ export async function POST(request) {
     if (!markdownContent) {
       return NextResponse.json(
         { error: "Markdown content is required" },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -1596,7 +1608,7 @@ export async function POST(request) {
       await page.close();
       await browser.close();
 
-      // Create response with proper headers
+      // Create response with proper headers including CORS
       return new NextResponse(pdf, {
         status: 200,
         headers: {
@@ -1604,6 +1616,7 @@ export async function POST(request) {
           'Content-Length': pdf.length.toString(),
           'Content-Disposition': 'attachment; filename="document.pdf"',
           'Cache-Control': 'no-cache',
+          ...corsHeaders
         },
       });
 
@@ -1614,7 +1627,7 @@ export async function POST(request) {
         details: browserError.message,
         type: 'BROWSER_INIT_ERROR',
         timestamp: new Date().toISOString()
-      }, { status: 500 });
+      }, { status: 500, headers: corsHeaders });
     }
 
   } catch (error) {
@@ -1653,6 +1666,6 @@ export async function POST(request) {
         syscall: error.syscall,
         timestamp: new Date().toISOString()
       }
-    }, { status: 500 });
+    }, { status: 500, headers: corsHeaders });
   }
 }
