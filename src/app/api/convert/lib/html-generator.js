@@ -9,9 +9,13 @@ export function generateStyledHtml(htmlContent, theme, paperSize) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PDF Document</title>
   <style>
-    /* Import fonts */
+    /* Import comprehensive Unicode fonts first, then aesthetic fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols:opsz,wght@12..48,400&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols+2:wght@400&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@400;500&display=swap');
     
     /* Reset and base styles */
     * {
@@ -21,7 +25,7 @@ export function generateStyledHtml(htmlContent, theme, paperSize) {
     }
     
     html, body {
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Inter', 'Noto Sans', 'Noto Sans Symbols', 'Noto Sans Symbols 2', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Apple Symbols', 'Arial Unicode MS', sans-serif;
       font-size: 9pt;
       line-height: 1.6;
       color: ${theme.textColor};
@@ -88,7 +92,7 @@ export function generateStyledHtml(htmlContent, theme, paperSize) {
     
     /* Code */
     code {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: 'JetBrains Mono', 'Noto Sans Mono', 'Noto Sans Symbols', 'Consolas', 'Monaco', 'Courier New', monospace;
       font-size: 8pt;
       background-color: ${theme.codeBackgroundColor};
       padding: 0.2em 0.4em;
@@ -97,7 +101,7 @@ export function generateStyledHtml(htmlContent, theme, paperSize) {
     }
     
     pre {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: 'JetBrains Mono', 'Noto Sans Mono', 'Noto Sans Symbols', 'Consolas', 'Monaco', 'Courier New', monospace;
       font-size: 8pt;
       background-color: ${theme.codeBackgroundColor};
       padding: 1em;
@@ -269,9 +273,9 @@ export function generateStyledHtml(htmlContent, theme, paperSize) {
     .page-break-after {
       page-break-after: always;
       break-after: page;
-    }
-    
-    /* Container */
+          }
+      
+      /* Container */
     .content-wrapper {
       max-width: none;
       padding: 1em;
