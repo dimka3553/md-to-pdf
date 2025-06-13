@@ -34,46 +34,29 @@ export async function generatePdf(styledHtml, paperSize) {
       timeout: 30000
     });
 
-    // Wait for fonts to load and debug font availability
+    // Wait for fonts to load completely
     await page.evaluate(async () => {
-      // Wait for Google Fonts to load
-      if (document.fonts) {
-        await document.fonts.ready;
-        console.log('Fonts loaded:', document.fonts.size);
-      }
+      await document.fonts.ready;
       
-      // Test if arrow symbol renders correctly and fix if needed
-      const testEl = document.createElement('div');
-      testEl.innerHTML = '→';
-      testEl.style.visibility = 'hidden';
-      testEl.style.position = 'absolute';
-      document.body.appendChild(testEl);
+      // Additional check for specific fonts
+      const fontFaces = [
+        'Inter', 'JetBrains Mono', 'Noto Sans', 
+        'Noto Sans Mono', 'Noto Sans Symbols', 'Noto Sans Symbols 2'
+      ];
       
-      // Get computed style to see what font is actually being used
-      const computedStyle = window.getComputedStyle(testEl);
-      console.log('Font family for arrow test:', computedStyle.fontFamily);
+      const fontPromises = fontFaces.map(fontFamily => {
+        return document.fonts.load(`400 16px "${fontFamily}"`).catch(() => {
+          // Ignore errors for fonts that might not be available
+          console.warn(`Font ${fontFamily} could not be loaded, using fallback`);
+        });
+      });
       
-      // Check if the arrow renders (basic heuristic)
-      const testWidth = testEl.offsetWidth;
-      console.log('Arrow test element width:', testWidth);
+      await Promise.allSettled(fontPromises);
       
-      // If the arrow isn't rendering properly (too narrow), force a better font
-      if (testWidth < 8) {
-        console.log('Arrow not rendering properly, applying font fix');
-        // Apply a more specific font that should work
-        const style = document.createElement('style');
-        style.textContent = `
-          body, body * {
-            font-family: "Arial Unicode MS", "Lucida Grande", "DejaVu Sans", "Segoe UI", sans-serif !important;
-          }
-          code, pre, code *, pre * {
-            font-family: "Courier New", "DejaVu Sans Mono", monospace !important;
-          }
-        `;
-        document.head.appendChild(style);
-      }
-      
-      document.body.removeChild(testEl);
+      // Force a repaint to ensure font rendering
+      document.body.style.display = 'none';
+      document.body.offsetHeight; // Trigger reflow
+      document.body.style.display = '';
     });
 
     // Add specific handler for image loading

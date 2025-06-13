@@ -9,20 +9,13 @@ export function generateStyledHtml(htmlContent, theme, paperSize) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PDF Document</title>
   <style>
-    /* Import comprehensive Unicode fonts first, then aesthetic fonts */
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=block');
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols:opsz,wght@12..48,400&display=block');
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols+2:wght@400&display=block');
+    /* Import fonts */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@400;500&display=block');
-    
-    /* Fallback font faces for critical symbols */
-    @font-face {
-      font-family: 'Symbol Fallback';
-      src: local('Arial Unicode MS'), local('Lucida Grande'), local('DejaVu Sans'), local('Segoe UI Symbol');
-      unicode-range: U+2190-21FF, U+2200-22FF, U+27F0-27FF, U+2900-297F;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols:wght@400&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols+2:wght@400&display=swap');
     
     /* Reset and base styles */
     * {
@@ -32,7 +25,7 @@ export function generateStyledHtml(htmlContent, theme, paperSize) {
     }
     
     html, body {
-      font-family: 'Inter', 'Noto Sans', 'Noto Sans Symbols', 'Noto Sans Symbols 2', 'Symbol Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial Unicode MS', 'Lucida Grande', 'DejaVu Sans', sans-serif;
+      font-family: 'Inter', 'Noto Sans', 'Noto Sans Symbols', 'Noto Sans Symbols 2', system-ui, -apple-system, 'Segoe UI', 'Arial Unicode MS', 'Lucida Grande', sans-serif;
       font-size: 9pt;
       line-height: 1.6;
       color: ${theme.textColor};
@@ -99,7 +92,7 @@ export function generateStyledHtml(htmlContent, theme, paperSize) {
     
     /* Code */
     code {
-      font-family: 'JetBrains Mono', 'Noto Sans Mono', 'Noto Sans Symbols', 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-family: 'JetBrains Mono', 'Noto Sans Mono', 'Courier New', 'Noto Sans Symbols', 'Noto Sans Symbols 2', monospace;
       font-size: 8pt;
       background-color: ${theme.codeBackgroundColor};
       padding: 0.2em 0.4em;
@@ -108,7 +101,7 @@ export function generateStyledHtml(htmlContent, theme, paperSize) {
     }
     
     pre {
-      font-family: 'JetBrains Mono', 'Noto Sans Mono', 'Noto Sans Symbols', 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-family: 'JetBrains Mono', 'Noto Sans Mono', 'Courier New', 'Noto Sans Symbols', 'Noto Sans Symbols 2', monospace;
       font-size: 8pt;
       background-color: ${theme.codeBackgroundColor};
       padding: 1em;
@@ -280,9 +273,15 @@ export function generateStyledHtml(htmlContent, theme, paperSize) {
     .page-break-after {
       page-break-after: always;
       break-after: page;
-          }
-      
-      /* Container */
+    }
+    
+    /* Enhanced text rendering for better Unicode support */
+    * {
+      font-feature-settings: "kern" 1, "liga" 1;
+      text-rendering: optimizeLegibility;
+    }
+
+    /* Container */
     .content-wrapper {
       max-width: none;
       padding: 1em;
