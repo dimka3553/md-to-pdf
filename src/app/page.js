@@ -34,7 +34,9 @@ export default function Home() {
 
 ## Section 1
 
-This is a paragraph with inline math: $E = mc^2$
+This costs $10 and that costs $25.50. Regular dollar amounts work fine!
+
+But math formulas still work: $E = mc^2$ and $x + y = z$.
 
 ## Section 2
 
@@ -44,7 +46,7 @@ $$
 \\frac{d}{dx}\\left( \\int_{0}^{x} f(u)\\,du\\right)=f(x)
 $$
 
-More text here.
+The product costs $199.99 (not treated as math).
 `);
   const [theme, setTheme] = useState('light'); // 'light' or 'dark'
   const [paperSize, setPaperSize] = useState('A4'); // Only A4 now

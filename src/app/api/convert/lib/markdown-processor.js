@@ -455,7 +455,28 @@ function processFormulas(markdownContent) {
   let displayCounter = 0;
   let inlineCounter = 0;
   
-  // First pass: Replace display math ($$...$$) to avoid conflicts
+  // Store code blocks and inline code to avoid processing $ inside them
+  const codeBlocks = [];
+  let codeBlockCounter = 0;
+  
+  // Temporarily replace code blocks with placeholders
+  markdownContent = markdownContent.replace(/```[\s\S]*?```/g, (match) => {
+    const placeholder = `__CODE_BLOCK_${codeBlockCounter}__`;
+    codeBlocks[placeholder] = match;
+    codeBlockCounter++;
+    return placeholder;
+  });
+  
+  // Temporarily replace inline code with placeholders
+  markdownContent = markdownContent.replace(/`([^`\r\n]+?)`/g, (match) => {
+    const placeholder = `__INLINE_CODE_${codeBlockCounter}__`;
+    codeBlocks[placeholder] = match;
+    codeBlockCounter++;
+    return placeholder;
+  });
+  
+  // Now process math formulas (safe from code interference)
+  // First pass: Replace display math ($$...$$)
   markdownContent = markdownContent.replace(/\$\$([\s\S]*?)\$\$/g, (match, formula) => {
     const placeholder = `<!--DISPLAY_MATH_${displayCounter}-->`;
     try {
@@ -473,8 +494,34 @@ function processFormulas(markdownContent) {
     return placeholder;
   });
 
-  // Second pass: Replace inline math ($...$) - now safe from display math conflicts
+  // Second pass: Replace inline math ($...$) - but be smart about what constitutes math
   markdownContent = markdownContent.replace(/\$([^$\r\n]+?)\$/g, (match, formula) => {
+    // Only treat as math if it contains mathematical indicators
+    const mathIndicators = [
+      // Mathematical operators
+      /[+\-*/=<>≥≤≠±∓×÷]/,
+      // Fractions, roots, etc.
+      /\\frac|\\sqrt|\\sum|\\int|\\prod|\\lim/,
+      // Greek letters
+      /\\alpha|\\beta|\\gamma|\\delta|\\epsilon|\\theta|\\lambda|\\mu|\\pi|\\sigma|\\phi|\\psi|\\omega/,
+      // Superscripts/subscripts
+      /\^|_/,
+      // Mathematical functions
+      /\\sin|\\cos|\\tan|\\log|\\ln|\\exp/,
+      // Variables with subscripts/superscripts or in equations
+      /[a-zA-Z]\s*[+\-=]/,
+      // Common math patterns like E = mc^2
+      /[A-Za-z]\s*=\s*[A-Za-z]/
+    ];
+    
+    const isMath = mathIndicators.some(pattern => pattern.test(formula));
+    
+    if (!isMath) {
+      // Not math, return original match unchanged
+      return match;
+    }
+    
+    // It's math, process it
     const placeholder = `<!--INLINE_MATH_${inlineCounter}-->`;
     try {
       inlineMathPlaceholders[placeholder] = katex.renderToString(formula.trim(), {
@@ -489,6 +536,11 @@ function processFormulas(markdownContent) {
     }
     inlineCounter++;
     return placeholder;
+  });
+  
+  // Restore code blocks and inline code
+  Object.keys(codeBlocks).forEach(placeholder => {
+    markdownContent = markdownContent.replace(placeholder, codeBlocks[placeholder]);
   });
 
   return { markdownContent, displayMathPlaceholders, inlineMathPlaceholders };
