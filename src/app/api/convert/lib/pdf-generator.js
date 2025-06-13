@@ -34,6 +34,48 @@ export async function generatePdf(styledHtml, paperSize) {
       timeout: 30000
     });
 
+    // Wait for fonts to load and debug font availability
+    await page.evaluate(async () => {
+      // Wait for Google Fonts to load
+      if (document.fonts) {
+        await document.fonts.ready;
+        console.log('Fonts loaded:', document.fonts.size);
+      }
+      
+      // Test if arrow symbol renders correctly and fix if needed
+      const testEl = document.createElement('div');
+      testEl.innerHTML = '→';
+      testEl.style.visibility = 'hidden';
+      testEl.style.position = 'absolute';
+      document.body.appendChild(testEl);
+      
+      // Get computed style to see what font is actually being used
+      const computedStyle = window.getComputedStyle(testEl);
+      console.log('Font family for arrow test:', computedStyle.fontFamily);
+      
+      // Check if the arrow renders (basic heuristic)
+      const testWidth = testEl.offsetWidth;
+      console.log('Arrow test element width:', testWidth);
+      
+      // If the arrow isn't rendering properly (too narrow), force a better font
+      if (testWidth < 8) {
+        console.log('Arrow not rendering properly, applying font fix');
+        // Apply a more specific font that should work
+        const style = document.createElement('style');
+        style.textContent = `
+          body, body * {
+            font-family: "Arial Unicode MS", "Lucida Grande", "DejaVu Sans", "Segoe UI", sans-serif !important;
+          }
+          code, pre, code *, pre * {
+            font-family: "Courier New", "DejaVu Sans Mono", monospace !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+      
+      document.body.removeChild(testEl);
+    });
+
     // Add specific handler for image loading
     await page.evaluate(async () => {
       // Helper function to wait for all images

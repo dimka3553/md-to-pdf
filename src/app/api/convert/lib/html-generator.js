@@ -10,12 +10,19 @@ export function generateStyledHtml(htmlContent, theme, paperSize) {
   <title>PDF Document</title>
   <style>
     /* Import comprehensive Unicode fonts first, then aesthetic fonts */
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols:opsz,wght@12..48,400&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols+2:wght@400&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=block');
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols:opsz,wght@12..48,400&display=block');
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols+2:wght@400&display=block');
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@400;500&display=block');
+    
+    /* Fallback font faces for critical symbols */
+    @font-face {
+      font-family: 'Symbol Fallback';
+      src: local('Arial Unicode MS'), local('Lucida Grande'), local('DejaVu Sans'), local('Segoe UI Symbol');
+      unicode-range: U+2190-21FF, U+2200-22FF, U+27F0-27FF, U+2900-297F;
+    }
     
     /* Reset and base styles */
     * {
@@ -25,7 +32,7 @@ export function generateStyledHtml(htmlContent, theme, paperSize) {
     }
     
     html, body {
-      font-family: 'Inter', 'Noto Sans', 'Noto Sans Symbols', 'Noto Sans Symbols 2', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Apple Symbols', 'Arial Unicode MS', sans-serif;
+      font-family: 'Inter', 'Noto Sans', 'Noto Sans Symbols', 'Noto Sans Symbols 2', 'Symbol Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial Unicode MS', 'Lucida Grande', 'DejaVu Sans', sans-serif;
       font-size: 9pt;
       line-height: 1.6;
       color: ${theme.textColor};
