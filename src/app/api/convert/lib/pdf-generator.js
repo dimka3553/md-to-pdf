@@ -118,12 +118,12 @@ export async function generatePdf(styledHtml, paperSize) {
       
       await waitForAllImages();
       
-      // Apply smart page break logic after images are loaded
+      // Smart page break logic for headings, but prevent empty pages
       const PAGE_HEIGHT_PX = 1123; // A4 height in pixels at 96 DPI
       const TOP_MARGIN_PX = 40;
       const BOTTOM_MARGIN_PX = 50;
       const USABLE_PAGE_HEIGHT = PAGE_HEIGHT_PX - TOP_MARGIN_PX - BOTTOM_MARGIN_PX;
-      const BREAK_THRESHOLD = 0.80; // Trigger break only when heading is within the bottom 20% of the usable page height
+      const BREAK_THRESHOLD = 0.75; // Trigger break when heading is in bottom 25% of page
       
       const headings = document.querySelectorAll('.smart-break');
       let lastBreakPosition = 0;
@@ -142,7 +142,6 @@ export async function generatePdf(styledHtml, paperSize) {
           
           // Look for actual content (not just breaks or empty elements)
           while (previousElement && !hasContentBefore) {
-            // Skip other page break elements or empty divs
             if (!previousElement.classList.contains('page-break-before') && 
                 !previousElement.classList.contains('position-tracker') &&
                 previousElement.textContent.trim().length > 0) {
@@ -151,8 +150,23 @@ export async function generatePdf(styledHtml, paperSize) {
             previousElement = previousElement.previousElementSibling;
           }
           
-          // Only add a page break if there's actual content before this heading
-          if (hasContentBefore) {
+          // CRITICAL: Check if there's substantial content AFTER this heading
+          let nextElement = heading.nextElementSibling;
+          let contentAfterHeading = 0;
+          let elementsAfter = 0;
+          
+          while (nextElement) {
+            const text = nextElement.textContent.trim();
+            contentAfterHeading += text.length;
+            if (text.length > 0) elementsAfter++;
+            nextElement = nextElement.nextElementSibling;
+          }
+          
+          // Only add page break if:
+          // 1. There's content before the heading
+          // 2. There's substantial content (100+ chars) after the heading
+          // 3. There are multiple elements after the heading (not just one small thing)
+          if (hasContentBefore && contentAfterHeading > 100 && elementsAfter > 1) {
             const pageBreak = document.createElement('div');
             pageBreak.className = 'page-break-before';
             heading.parentNode.insertBefore(pageBreak, heading);
@@ -161,28 +175,18 @@ export async function generatePdf(styledHtml, paperSize) {
         }
       });
       
-      // Cleanup any consecutive page breaks (which can cause empty pages)
-      const allBreaks = document.querySelectorAll('.page-break-before, .force-page-break');
-      allBreaks.forEach(breakEl => {
-        let nextEl = breakEl.nextElementSibling;
-        // If the next element is also a break, remove the current one
-        if (nextEl && (nextEl.classList.contains('page-break-before') || nextEl.classList.contains('force-page-break'))) {
-          breakEl.parentNode.removeChild(breakEl);
-        }
-        
-        // If there's no content after this break before the end of document, remove it
-        let hasContentAfter = false;
-        while (nextEl) {
-          if (nextEl.textContent.trim().length > 0) {
-            hasContentAfter = true;
-            break;
-          }
-          nextEl = nextEl.nextElementSibling;
-        }
-        
-        if (!hasContentAfter) {
-          breakEl.parentNode.removeChild(breakEl);
-        }
+      // Prevent tables from breaking badly
+      const tables = document.querySelectorAll('table');
+      tables.forEach(table => {
+        table.style.breakInside = 'avoid';
+        table.style.pageBreakInside = 'avoid';
+      });
+      
+      // Prevent headings from being orphaned at the bottom of pages
+      const allHeadings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      allHeadings.forEach(heading => {
+        heading.style.breakAfter = 'avoid';
+        heading.style.pageBreakAfter = 'avoid';
       });
     });
 
