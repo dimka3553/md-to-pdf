@@ -269,7 +269,7 @@ marked.setOptions({
     return safeHighlight(codeStr, language); // Pass to our main highlighter
   },
   gfm: true,
-  breaks: false,
+  breaks: true,
   pedantic: false,
   smartLists: true,
   smartypants: true,
