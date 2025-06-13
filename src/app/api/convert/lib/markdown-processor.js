@@ -167,7 +167,7 @@ renderer.code = function(tokenOrCode, infoStringOrLang, escaped) {
   console.log(`[renderer.code] Output from highlight fn (len: ${highlightedCode.length}): "${highlightedCode.substring(0, 70).replace(/\n/g, '\\n')}..."`);
 
   let titleDisplayString = '';
-  const escapedLang = language && language.toLowerCase() !== 'none' && language.trim() !== '' ? escapeHtml(language) : '';
+  const escapedLang = language && language.toLowerCase() !== 'none' && language.toLowerCase() !== 'text' && language.trim() !== '' ? escapeHtml(language) : '';
   const escapedTitle = title ? escapeHtml(title) : '';
 
   if (escapedTitle && escapedLang) {
