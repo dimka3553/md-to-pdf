@@ -34,9 +34,17 @@ export default function Home() {
 
 ## Section 1
 
-This is a paragraph.
+This is a paragraph with inline math: $E = mc^2$
 
 ## Section 2
+
+Here's a display formula:
+
+$$
+\\frac{d}{dx}\\left( \\int_{0}^{x} f(u)\\,du\\right)=f(x)
+$$
+
+More text here.
 `);
   const [theme, setTheme] = useState('light'); // 'light' or 'dark'
   const [paperSize, setPaperSize] = useState('A4'); // Only A4 now

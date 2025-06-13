@@ -1,6 +1,7 @@
 import { marked } from 'marked';
 import hljs from 'highlight.js';
 import twemoji from 'twemoji';
+import katex from 'katex';
 import { escapeHtml, slugify } from './utils.js';
 
 // Safely highlight code with proper error handling
@@ -433,7 +434,77 @@ export function processFootnotes(markdownContent, footnotes) {
 // Process markdown to HTML
 export function processMarkdown(markdownContent) {
   console.log('[processMarkdown] Original Markdown (first 200 chars):', markdownContent.substring(0,200) + (markdownContent.length > 200 ? "..." : ""));
-  let html = marked.parse(markdownContent);
+  
+  // Process LaTeX formulas first
+  const { markdownContent: processedMarkdown, displayMathPlaceholders, inlineMathPlaceholders } = processFormulas(markdownContent);
+  
+  let html = marked.parse(processedMarkdown);
   console.log('[processMarkdown] HTML after marked.parse (first 500 chars):', html.substring(0,500) + (html.length > 500 ? "..." : ""));
+  
+  // Restore the rendered formulas
+  html = restoreFormulas(html, displayMathPlaceholders, inlineMathPlaceholders);
+  
+  return html;
+}
+
+// Process LaTeX formulas in markdown
+function processFormulas(markdownContent) {
+  // Replace display math ($$...$$) with placeholders first
+  const displayMathPlaceholders = {};
+  let displayMathCounter = 0;
+  
+  markdownContent = markdownContent.replace(/\$\$([\s\S]*?)\$\$/g, (match, formula) => {
+    const placeholder = `__DISPLAY_MATH_${displayMathCounter}__`;
+    try {
+      displayMathPlaceholders[placeholder] = katex.renderToString(formula.trim(), {
+        displayMode: true,
+        throwOnError: false,
+        errorColor: '#cc0000',
+        strict: false
+      });
+    } catch (error) {
+      console.warn('[processFormulas] Display math error:', error.message);
+      displayMathPlaceholders[placeholder] = `<div class="math-error">Error rendering formula: ${escapeHtml(formula)}</div>`;
+    }
+    displayMathCounter++;
+    return placeholder;
+  });
+
+  // Replace inline math ($...$) with placeholders, but avoid conflicts with display math
+  const inlineMathPlaceholders = {};
+  let inlineMathCounter = 0;
+  
+  markdownContent = markdownContent.replace(/(?<!\$)\$(?!\$)(.*?)(?<!\$)\$(?!\$)/g, (match, formula) => {
+    const placeholder = `__INLINE_MATH_${inlineMathCounter}__`;
+    try {
+      inlineMathPlaceholders[placeholder] = katex.renderToString(formula.trim(), {
+        displayMode: false,
+        throwOnError: false,
+        errorColor: '#cc0000',
+        strict: false
+      });
+    } catch (error) {
+      console.warn('[processFormulas] Inline math error:', error.message);
+      inlineMathPlaceholders[placeholder] = `<span class="math-error">Error: ${escapeHtml(formula)}</span>`;
+    }
+    inlineMathCounter++;
+    return placeholder;
+  });
+
+  return { markdownContent, displayMathPlaceholders, inlineMathPlaceholders };
+}
+
+// Restore formula placeholders after markdown processing
+function restoreFormulas(html, displayMathPlaceholders, inlineMathPlaceholders) {
+  // Restore display math
+  Object.keys(displayMathPlaceholders).forEach(placeholder => {
+    html = html.replace(new RegExp(placeholder, 'g'), displayMathPlaceholders[placeholder]);
+  });
+  
+  // Restore inline math
+  Object.keys(inlineMathPlaceholders).forEach(placeholder => {
+    html = html.replace(new RegExp(placeholder, 'g'), inlineMathPlaceholders[placeholder]);
+  });
+  
   return html;
 } 

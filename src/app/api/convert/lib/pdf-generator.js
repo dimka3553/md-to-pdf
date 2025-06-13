@@ -41,7 +41,8 @@ export async function generatePdf(styledHtml, paperSize) {
       // Additional check for specific fonts
       const fontFaces = [
         'Inter', 'JetBrains Mono', 'Noto Sans', 
-        'Noto Sans Mono', 'Noto Sans Symbols', 'Noto Sans Symbols 2'
+        'Noto Sans Mono', 'Noto Sans Symbols', 'Noto Sans Symbols 2',
+        'KaTeX_Main', 'KaTeX_Math', 'KaTeX_AMS' // KaTeX fonts
       ];
       
       const fontPromises = fontFaces.map(fontFamily => {
@@ -52,6 +53,23 @@ export async function generatePdf(styledHtml, paperSize) {
       });
       
       await Promise.allSettled(fontPromises);
+      
+      // Wait for KaTeX elements to be fully rendered
+      const katexElements = document.querySelectorAll('.katex');
+      if (katexElements.length > 0) {
+        // Wait a bit more for KaTeX to finish rendering
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Check if KaTeX math elements have proper dimensions
+        katexElements.forEach(katex => {
+          if (katex.offsetHeight === 0 || katex.offsetWidth === 0) {
+            console.warn('KaTeX element has zero dimensions, forcing reflow');
+            katex.style.display = 'none';
+            katex.offsetHeight; // Force reflow
+            katex.style.display = '';
+          }
+        });
+      }
       
       // Force a repaint to ensure font rendering
       document.body.style.display = 'none';
