@@ -433,28 +433,31 @@ export function processFootnotes(markdownContent, footnotes) {
 
 // Process markdown to HTML
 export function processMarkdown(markdownContent) {
-  console.log('[processMarkdown] Original Markdown (first 200 chars):', markdownContent.substring(0,200) + (markdownContent.length > 200 ? "..." : ""));
+  console.log('[processMarkdown] Processing markdown with LaTeX formulas...');
   
   // Process LaTeX formulas first
   const { markdownContent: processedMarkdown, displayMathPlaceholders, inlineMathPlaceholders } = processFormulas(markdownContent);
   
   let html = marked.parse(processedMarkdown);
-  console.log('[processMarkdown] HTML after marked.parse (first 500 chars):', html.substring(0,500) + (html.length > 500 ? "..." : ""));
   
   // Restore the rendered formulas
   html = restoreFormulas(html, displayMathPlaceholders, inlineMathPlaceholders);
+  
+  console.log(`[processMarkdown] Processed ${Object.keys(displayMathPlaceholders).length} display formulas and ${Object.keys(inlineMathPlaceholders).length} inline formulas`);
   
   return html;
 }
 
 // Process LaTeX formulas in markdown
 function processFormulas(markdownContent) {
-  // Replace display math ($$...$$) with placeholders first
   const displayMathPlaceholders = {};
-  let displayMathCounter = 0;
+  const inlineMathPlaceholders = {};
+  let displayCounter = 0;
+  let inlineCounter = 0;
   
+  // First pass: Replace display math ($$...$$) to avoid conflicts
   markdownContent = markdownContent.replace(/\$\$([\s\S]*?)\$\$/g, (match, formula) => {
-    const placeholder = `__DISPLAY_MATH_${displayMathCounter}__`;
+    const placeholder = `<!--DISPLAY_MATH_${displayCounter}-->`;
     try {
       displayMathPlaceholders[placeholder] = katex.renderToString(formula.trim(), {
         displayMode: true,
@@ -466,16 +469,13 @@ function processFormulas(markdownContent) {
       console.warn('[processFormulas] Display math error:', error.message);
       displayMathPlaceholders[placeholder] = `<div class="math-error">Error rendering formula: ${escapeHtml(formula)}</div>`;
     }
-    displayMathCounter++;
+    displayCounter++;
     return placeholder;
   });
 
-  // Replace inline math ($...$) with placeholders, but avoid conflicts with display math
-  const inlineMathPlaceholders = {};
-  let inlineMathCounter = 0;
-  
-  markdownContent = markdownContent.replace(/(?<!\$)\$(?!\$)(.*?)(?<!\$)\$(?!\$)/g, (match, formula) => {
-    const placeholder = `__INLINE_MATH_${inlineMathCounter}__`;
+  // Second pass: Replace inline math ($...$) - now safe from display math conflicts
+  markdownContent = markdownContent.replace(/\$([^$\r\n]+?)\$/g, (match, formula) => {
+    const placeholder = `<!--INLINE_MATH_${inlineCounter}-->`;
     try {
       inlineMathPlaceholders[placeholder] = katex.renderToString(formula.trim(), {
         displayMode: false,
@@ -487,7 +487,7 @@ function processFormulas(markdownContent) {
       console.warn('[processFormulas] Inline math error:', error.message);
       inlineMathPlaceholders[placeholder] = `<span class="math-error">Error: ${escapeHtml(formula)}</span>`;
     }
-    inlineMathCounter++;
+    inlineCounter++;
     return placeholder;
   });
 
@@ -496,14 +496,16 @@ function processFormulas(markdownContent) {
 
 // Restore formula placeholders after markdown processing
 function restoreFormulas(html, displayMathPlaceholders, inlineMathPlaceholders) {
-  // Restore display math
+  // Restore display math - HTML comments are preserved by markdown processor
   Object.keys(displayMathPlaceholders).forEach(placeholder => {
-    html = html.replace(new RegExp(placeholder, 'g'), displayMathPlaceholders[placeholder]);
+    const escapedPlaceholder = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    html = html.replace(new RegExp(escapedPlaceholder, 'g'), displayMathPlaceholders[placeholder]);
   });
   
-  // Restore inline math
+  // Restore inline math - HTML comments are preserved by markdown processor
   Object.keys(inlineMathPlaceholders).forEach(placeholder => {
-    html = html.replace(new RegExp(placeholder, 'g'), inlineMathPlaceholders[placeholder]);
+    const escapedPlaceholder = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    html = html.replace(new RegExp(escapedPlaceholder, 'g'), inlineMathPlaceholders[placeholder]);
   });
   
   return html;
