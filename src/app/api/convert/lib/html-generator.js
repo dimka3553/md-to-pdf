@@ -17,9 +17,6 @@ export function generateStyledHtml(htmlContent, theme, paperSize) {
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols:wght@400&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols+2:wght@400&display=swap');
     
-    /* KaTeX CSS for math formulas */
-    @import url('https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css');
-    
     /* Reset and base styles */
     * {
       margin: 0;
@@ -283,60 +280,6 @@ export function generateStyledHtml(htmlContent, theme, paperSize) {
       font-feature-settings: "kern" 1, "liga" 1;
       text-rendering: optimizeLegibility;
     }
-
-    /* Math formulas styling */
-    .katex {
-      font-size: 1em;
-      color: ${theme.textColor};
-    }
-    
-    .katex-display {
-      margin: 1.5em 0;
-      text-align: center;
-      overflow-x: auto;
-      overflow-y: hidden;
-    }
-    
-    .katex-display > .katex {
-      display: inline-block;
-      text-align: initial;
-    }
-    
-    .math-error {
-      color: #cc0000;
-      background-color: ${isDark ? 'rgba(204, 52, 52, 0.1)' : 'rgba(254, 226, 226, 1)'};
-      padding: 0.25em 0.5em;
-      border-radius: 0.25em;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.9em;
-      border: 1px solid ${isDark ? '#7f1d1d' : '#fca5a5'};
-    }
-    
-    /* Override KaTeX colors for dark theme */
-    ${isDark ? `
-    .katex .mord, .katex .mop, .katex .mbin, .katex .mrel, 
-    .katex .mopen, .katex .mclose, .katex .mpunct {
-      color: ${theme.textColor} !important;
-    }
-    
-    .katex .mfrac .frac-line {
-      border-bottom-color: ${theme.textColor} !important;
-    }
-    
-    .katex .sqrt > .root {
-      color: ${theme.textColor} !important;
-    }
-    
-    .katex .accent .accent-body, 
-    .katex .overline .overline-line,
-    .katex .underline .underline-line {
-      border-color: ${theme.textColor} !important;
-    }
-    
-    .katex .stretchy {
-      color: ${theme.textColor} !important;
-    }
-    ` : ''}
 
     /* Container */
     .content-wrapper {

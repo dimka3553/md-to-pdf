@@ -34,19 +34,27 @@ export default function Home() {
 
 ## Section 1
 
-This costs $10 and that costs $25.50. Regular dollar amounts work fine!
-
-But math formulas still work: $E = mc^2$ and $x + y = z$.
+This is a sample markdown document. You can write **bold text**, *italic text*, and \`inline code\`.
 
 ## Section 2
 
-Here's a display formula:
+Here's a code block:
 
-$$
-\\frac{d}{dx}\\left( \\int_{0}^{x} f(u)\\,du\\right)=f(x)
-$$
+\`\`\`javascript
+function hello() {
+  console.log("Hello, world!");
+}
+\`\`\`
 
-The product costs $199.99 (not treated as math).
+## Lists
+
+- Item 1
+- Item 2
+- Item 3
+
+1. First item
+2. Second item
+3. Third item
 `);
   const [theme, setTheme] = useState('light'); // 'light' or 'dark'
   const [paperSize, setPaperSize] = useState('A4'); // Only A4 now
