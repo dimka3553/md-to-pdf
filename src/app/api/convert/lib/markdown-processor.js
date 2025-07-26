@@ -1,7 +1,6 @@
 import { marked } from 'marked';
 import hljs from 'highlight.js';
 import twemoji from 'twemoji';
-import katex from 'katex';
 import { escapeHtml, slugify } from './utils.js';
 
 // Safely highlight code with proper error handling
@@ -433,132 +432,11 @@ export function processFootnotes(markdownContent, footnotes) {
 
 // Process markdown to HTML
 export function processMarkdown(markdownContent) {
-  console.log('[processMarkdown] Processing markdown with LaTeX formulas...');
+  console.log('[processMarkdown] Processing markdown...');
   
-  // Process LaTeX formulas first
-  const { markdownContent: processedMarkdown, displayMathPlaceholders, inlineMathPlaceholders } = processFormulas(markdownContent);
-  
-  let html = marked.parse(processedMarkdown);
-  
-  // Restore the rendered formulas
-  html = restoreFormulas(html, displayMathPlaceholders, inlineMathPlaceholders);
-  
-  console.log(`[processMarkdown] Processed ${Object.keys(displayMathPlaceholders).length} display formulas and ${Object.keys(inlineMathPlaceholders).length} inline formulas`);
+  let html = marked.parse(markdownContent);
   
   return html;
 }
 
-// Process LaTeX formulas in markdown
-function processFormulas(markdownContent) {
-  const displayMathPlaceholders = {};
-  const inlineMathPlaceholders = {};
-  let displayCounter = 0;
-  let inlineCounter = 0;
-  
-  // Store code blocks and inline code to avoid processing $ inside them
-  const codeBlocks = [];
-  let codeBlockCounter = 0;
-  
-  // Temporarily replace code blocks with placeholders
-  markdownContent = markdownContent.replace(/```[\s\S]*?```/g, (match) => {
-    const placeholder = `__CODE_BLOCK_${codeBlockCounter}__`;
-    codeBlocks[placeholder] = match;
-    codeBlockCounter++;
-    return placeholder;
-  });
-  
-  // Temporarily replace inline code with placeholders
-  markdownContent = markdownContent.replace(/`([^`\r\n]+?)`/g, (match) => {
-    const placeholder = `__INLINE_CODE_${codeBlockCounter}__`;
-    codeBlocks[placeholder] = match;
-    codeBlockCounter++;
-    return placeholder;
-  });
-  
-  // Now process math formulas (safe from code interference)
-  // First pass: Replace display math ($$...$$)
-  markdownContent = markdownContent.replace(/\$\$([\s\S]*?)\$\$/g, (match, formula) => {
-    const placeholder = `<!--DISPLAY_MATH_${displayCounter}-->`;
-    try {
-      displayMathPlaceholders[placeholder] = katex.renderToString(formula.trim(), {
-        displayMode: true,
-        throwOnError: false,
-        errorColor: '#cc0000',
-        strict: false
-      });
-    } catch (error) {
-      console.warn('[processFormulas] Display math error:', error.message);
-      displayMathPlaceholders[placeholder] = `<div class="math-error">Error rendering formula: ${escapeHtml(formula)}</div>`;
-    }
-    displayCounter++;
-    return placeholder;
-  });
-
-  // Second pass: Replace inline math ($...$) - but be smart about what constitutes math
-  markdownContent = markdownContent.replace(/\$([^$\r\n]+?)\$/g, (match, formula) => {
-    // Only treat as math if it contains mathematical indicators
-    const mathIndicators = [
-      // Mathematical operators
-      /[+\-*/=<>≥≤≠±∓×÷]/,
-      // Fractions, roots, etc.
-      /\\frac|\\sqrt|\\sum|\\int|\\prod|\\lim/,
-      // Greek letters
-      /\\alpha|\\beta|\\gamma|\\delta|\\epsilon|\\theta|\\lambda|\\mu|\\pi|\\sigma|\\phi|\\psi|\\omega/,
-      // Superscripts/subscripts
-      /\^|_/,
-      // Mathematical functions
-      /\\sin|\\cos|\\tan|\\log|\\ln|\\exp/,
-      // Variables with subscripts/superscripts or in equations
-      /[a-zA-Z]\s*[+\-=]/,
-      // Common math patterns like E = mc^2
-      /[A-Za-z]\s*=\s*[A-Za-z]/
-    ];
-    
-    const isMath = mathIndicators.some(pattern => pattern.test(formula));
-    
-    if (!isMath) {
-      // Not math, return original match unchanged
-      return match;
-    }
-    
-    // It's math, process it
-    const placeholder = `<!--INLINE_MATH_${inlineCounter}-->`;
-    try {
-      inlineMathPlaceholders[placeholder] = katex.renderToString(formula.trim(), {
-        displayMode: false,
-        throwOnError: false,
-        errorColor: '#cc0000',
-        strict: false
-      });
-    } catch (error) {
-      console.warn('[processFormulas] Inline math error:', error.message);
-      inlineMathPlaceholders[placeholder] = `<span class="math-error">Error: ${escapeHtml(formula)}</span>`;
-    }
-    inlineCounter++;
-    return placeholder;
-  });
-  
-  // Restore code blocks and inline code
-  Object.keys(codeBlocks).forEach(placeholder => {
-    markdownContent = markdownContent.replace(placeholder, codeBlocks[placeholder]);
-  });
-
-  return { markdownContent, displayMathPlaceholders, inlineMathPlaceholders };
-}
-
-// Restore formula placeholders after markdown processing
-function restoreFormulas(html, displayMathPlaceholders, inlineMathPlaceholders) {
-  // Restore display math - HTML comments are preserved by markdown processor
-  Object.keys(displayMathPlaceholders).forEach(placeholder => {
-    const escapedPlaceholder = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    html = html.replace(new RegExp(escapedPlaceholder, 'g'), displayMathPlaceholders[placeholder]);
-  });
-  
-  // Restore inline math - HTML comments are preserved by markdown processor
-  Object.keys(inlineMathPlaceholders).forEach(placeholder => {
-    const escapedPlaceholder = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    html = html.replace(new RegExp(escapedPlaceholder, 'g'), inlineMathPlaceholders[placeholder]);
-  });
-  
-  return html;
-} 
+ 
