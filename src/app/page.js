@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import 'easymde/dist/easymde.min.css'; // Import EasyMDE styles
 import 'highlight.js/styles/github.css'; // Light theme syntax highlighting
 import 'highlight.js/styles/github-dark.css'; // Dark theme syntax highlighting
@@ -222,12 +223,12 @@ function hello() {
             </div>
             
             <nav className="flex items-center gap-4 flex-wrap" role="navigation" aria-label="Main">
-              <a
+              <Link
                 href="/scraper"
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors focus:ring-1 focus:outline-none ${theme === 'dark' ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
               >
                 Test Scraper
-              </a>
+              </Link>
               <div className="flex items-center gap-2">
                 <button
                   onClick={toggleTheme}

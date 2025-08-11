@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function ScraperTest() {
   const [url, setUrl] = useState('');
@@ -262,7 +263,7 @@ export default function ScraperTest() {
 
         {/* Navigation */}
         <div className="mt-8 text-center">
-          <a
+          <Link
             href="/"
             className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors duration-200"
           >
@@ -270,7 +271,7 @@ export default function ScraperTest() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             Back to PDF Converter
-          </a>
+          </Link>
         </div>
       </div>
     </div>
