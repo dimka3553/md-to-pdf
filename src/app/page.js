@@ -159,6 +159,22 @@ function hello() {
     // Removed resize event listener for scaling as preview is gone
   }, [theme]);
 
+  // Handle URL parameters for pre-filling content from scraper
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const content = urlParams.get('content');
+    if (content) {
+      try {
+        const decodedContent = decodeURIComponent(content);
+        setMarkdown(decodedContent);
+        // Clear the URL parameter after loading
+        window.history.replaceState(null, '', window.location.pathname);
+      } catch (error) {
+        console.error('Error decoding content parameter:', error);
+      }
+    }
+  }, []);
+
   // Editor options for SimpleMDE
   const editorOptions = useMemo(() => {
     return {
@@ -206,6 +222,12 @@ function hello() {
             </div>
             
             <nav className="flex items-center gap-4 flex-wrap" role="navigation" aria-label="Main">
+              <a
+                href="/scraper"
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors focus:ring-1 focus:outline-none ${theme === 'dark' ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+              >
+                Test Scraper
+              </a>
               <div className="flex items-center gap-2">
                 <button
                   onClick={toggleTheme}
