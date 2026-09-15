@@ -49,6 +49,7 @@ function FileMenu({ actions, isMac }) {
           <Item icon={<I.Copy className="h-4 w-4" />} label="Copy as HTML" onClick={actions.copyHtml} />
           <Item icon={<I.FilePdf className="h-4 w-4" />} label="Export PDF" shortcut={`${mod}⇧E`} onClick={actions.exportPdf} />
           <div className="my-1 h-px bg-gray-100 dark:bg-gray-800" />
+          <Item icon={<I.Bot className="h-4 w-4" />} label="Add to AI agent…" onClick={actions.addToAgent} />
           <Item icon={<I.Keyboard className="h-4 w-4" />} label="Keyboard shortcuts" shortcut="?" onClick={actions.shortcuts} />
           <Item icon={<I.Trash className="h-4 w-4" />} label="Clear document" onClick={actions.clear} danger />
         </div>
@@ -129,7 +130,11 @@ export default function TopBar({ fileName, onFileNameChange, actions, viewMode, 
         <IconButton label={uiDark ? 'Switch to light interface' : 'Switch to dark interface'} onClick={onToggleUiTheme}>
           {uiDark ? <I.Sun /> : <I.Moon />}
         </IconButton>
-        <Button variant="primary" size="sm" onClick={actions.exportPdf} disabled={exporting} className="ml-1">
+        <Button variant="secondary" size="sm" onClick={actions.addToAgent} className="ml-1" title="Connect the Markdown Studio MCP server to Cursor, Claude, VS Code, Codex and more">
+          <I.Bot className="h-3.5 w-3.5" />
+          <span className="hidden md:inline">Add to AI agent</span>
+        </Button>
+        <Button variant="primary" size="sm" onClick={actions.exportPdf} disabled={exporting}>
           {exporting ? <I.Spinner className="h-3.5 w-3.5" /> : <I.Download className="h-3.5 w-3.5" />}
           <span className="hidden sm:inline">{exporting ? 'Exporting…' : 'Export PDF'}</span>
         </Button>

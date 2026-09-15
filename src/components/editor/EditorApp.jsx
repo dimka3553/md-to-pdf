@@ -7,6 +7,7 @@ import FormatToolbar from './FormatToolbar';
 import DesignPanel from './DesignPanel';
 import PreviewPane from './PreviewPane';
 import { ImagesDialog, ImportUrlDialog, ShortcutsDialog, TemplatesDialog } from './dialogs';
+import { AddToAgentDialog } from './AddToAgentDialog';
 import { ToastProvider, useToast } from '../Toast';
 import ErrorBoundary from '../ErrorBoundary';
 import * as I from '../icons';
@@ -125,6 +126,14 @@ function Editor() {
     const id = setTimeout(() => setSaved(true), 600);
     return () => clearTimeout(id);
   }, [markdown, settings, assets]);
+
+  // Deep link into the "Add to AI agent" dialog (used from the README / docs): /#add-to-agent
+  useEffect(() => {
+    const check = () => window.location.hash === '#add-to-agent' && setDialog('agent');
+    check();
+    window.addEventListener('hashchange', check);
+    return () => window.removeEventListener('hashchange', check);
+  }, []);
 
   // Legacy ?content= parameter from the scraper page
   useEffect(() => {
@@ -341,6 +350,7 @@ function Editor() {
       copyHtml,
       exportPdf,
       shortcuts: () => setDialog('shortcuts'),
+      addToAgent: () => setDialog('agent'),
       clear: clearDocument,
     }),
     [downloadMarkdown, copyHtml, exportPdf, clearDocument],
@@ -495,6 +505,7 @@ function Editor() {
       <ImportUrlDialog open={dialog === 'import'} onClose={() => setDialog(null)} onImport={importFromUrl} />
       <TemplatesDialog open={dialog === 'templates'} onClose={() => setDialog(null)} onPick={applyTemplate} dirty={markdown.trim().length > 0} />
       <ShortcutsDialog open={dialog === 'shortcuts'} onClose={() => setDialog(null)} isMac={isMac} />
+      <AddToAgentDialog open={dialog === 'agent'} onClose={() => setDialog(null)} />
       <ImagesDialog
         open={dialog === 'images'}
         onClose={() => setDialog(null)}

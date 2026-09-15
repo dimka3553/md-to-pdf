@@ -52,6 +52,10 @@ Also exposed: resources `markdown-studio://guide`, `markdown-studio://design-opt
 
 ### Connect
 
+The quickest way: click **Add to AI agent** in the app's top bar (or open [md-to-pdf.vercel.app/#add-to-agent](https://md-to-pdf.vercel.app/#add-to-agent)), pick your agent, and it opens the app with the server pre-configured (Cursor, VS Code, Goose) or gives you the exact command / snippet (Claude Code, Codex, Gemini CLI, Claude Desktop, ChatGPT, Windsurf).
+
+Manual options:
+
 **Cursor** — [Add to Cursor](cursor://anysphere.cursor-deeplink/mcp/install?name=markdown-studio&config=eyJ1cmwiOiJodHRwczovL21kLXRvLXBkZi52ZXJjZWwuYXBwL2FwaS9tY3AifQ==) or put this in `.cursor/mcp.json` (project) / `~/.cursor/mcp.json` (global):
 
 ```json
