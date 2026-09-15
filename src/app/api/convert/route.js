@@ -1,128 +1,112 @@
 import { NextResponse } from 'next/server';
-import { lightTheme, darkTheme } from './lib/themes.js';
-import { processHtml, processFootnotes, processMarkdown } from './lib/markdown-processor.js';
-import { generateStyledHtml } from './lib/html-generator.js';
-import { generatePdf } from './lib/pdf-generator.js';
-import { corsHeaders } from './lib/utils.js';
+import { renderPdf } from '@/lib/pdf/generate.js';
+import { buildDocumentHtml } from '@/lib/document/html.js';
+import { normalizeSettings } from '@/lib/document/settings.js';
+import { corsHeaders } from '@/lib/cors.js';
 
-// Track footnotes globally
-let footnotes = {};
-let footnoteCounter = 0;
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-// Handle CORS preflight requests
+const MAX_MARKDOWN_BYTES = 2 * 1024 * 1024;
+const MAX_ASSETS = 24;
+const MAX_ASSET_BYTES = 3 * 1024 * 1024;
+const MAX_TOTAL_ASSET_BYTES = 8 * 1024 * 1024;
+
 export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+  return new NextResponse(null, { status: 204, headers: corsHeaders });
+}
+
+function badRequest(message) {
+  return NextResponse.json({ error: message }, { status: 400, headers: corsHeaders });
+}
+
+function sanitizeAssets(input) {
+  if (!input || typeof input !== 'object') return {};
+  const out = {};
+  let total = 0;
+  for (const [name, dataUrl] of Object.entries(input).slice(0, MAX_ASSETS)) {
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) continue;
+    if (dataUrl.length > MAX_ASSET_BYTES) throw new Error(`Image "${name}" is too large (max 3 MB).`);
+    total += dataUrl.length;
+    if (total > MAX_TOTAL_ASSET_BYTES) throw new Error('Total embedded image size exceeds 8 MB.');
+    out[String(name).slice(0, 200)] = dataUrl;
+  }
+  return out;
+}
+
+/** Accept the legacy body shape ({ theme: 'light'|'dark', paperSize }) as well as the new { settings }. */
+function settingsFromBody(body) {
+  if (body.settings && typeof body.settings === 'object') return normalizeSettings(body.settings);
+  return normalizeSettings({
+    theme: body.theme === 'dark' ? 'midnight' : 'clean',
+    paperSize: body.paperSize,
+  });
+}
+
+function safeFileName(title) {
+  const base = String(title || 'document')
+    .replace(/[^\p{L}\p{N}\-_ ]+/gu, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .slice(0, 80);
+  return `${base || 'document'}.pdf`;
 }
 
 export async function POST(request) {
+  let body;
   try {
-    const data = await request.json();
-    const { markdown: markdownContent, theme: selectedTheme = 'light', paperSize = 'A4' } = data;
+    body = await request.json();
+  } catch {
+    return badRequest('Request body must be JSON.');
+  }
 
-    if (!markdownContent) {
-      return NextResponse.json(
-        { error: "Markdown content is required" },
-        { status: 400, headers: corsHeaders }
-      );
-    }
+  const markdown = typeof body?.markdown === 'string' ? body.markdown : '';
+  if (!markdown.trim()) return badRequest('Markdown content is required.');
+  if (Buffer.byteLength(markdown, 'utf8') > MAX_MARKDOWN_BYTES) return badRequest('Markdown is too large (max 2 MB).');
 
-    // Reset footnotes for this conversion
-    footnotes = {};
-    footnoteCounter = 0;
-    
-    // Process footnotes in markdown text
-    const processedWithReferences = processFootnotes(markdownContent, footnotes);
+  let assets;
+  try {
+    assets = sanitizeAssets(body.assets);
+  } catch (err) {
+    return badRequest(err.message);
+  }
 
-    // Select theme based on user choice
-    const theme = selectedTheme === 'dark' ? darkTheme : lightTheme;
+  const settings = settingsFromBody(body);
+  const requestedName = body.fileName ? String(body.fileName).replace(/\.(md|pdf)$/i, '').slice(0, 120) : '';
 
-    // Process markdown to HTML
-    console.log('[POST] Original Markdown (first 200 chars):', markdownContent.substring(0,200) + (markdownContent.length > 200 ? "..." : ""));
-    let html = processMarkdown(processedWithReferences || markdownContent);
-    console.log('[POST] HTML after marked.parse (first 500 chars):', html.substring(0,500) + (html.length > 500 ? "..." : ""));
-    
-    // Process footnotes if there are any
-    if (Object.keys(footnotes).length > 0) {
-      // Add footnotes section at the end of the document
-      let footnotesHtml = '<div class="footnotes"><hr><ol class="footnote-list">';
-      
-      // Sort footnote refs numerically
-      const sortedRefs = Object.keys(footnotes).sort((a, b) => parseInt(a) - parseInt(b));
-      
-      // Create list items for each footnote in order
-      sortedRefs.forEach(ref => {
-        footnotesHtml += `<li id="footnote-${ref}" class="footnote-item" data-number="${ref}">
-          ${footnotes[ref]} <a href="#footnote-ref-${ref}" class="footnote-backref" aria-label="Back to content">↩</a>
-        </li>`;
-      });
-      
-      footnotesHtml += '</ol></div>';
-      
-      // Append footnotes section to the document
-      html += footnotesHtml;
-      
-      // Reset footnotes object for next conversion
-      footnotes = [];
-      footnoteCounter = 0;
-    }
-    
-    html = processHtml(html);
-    console.log('[POST] HTML after processHtml (first 500 chars):', html.substring(0,500) + (html.length > 500 ? "..." : ""));
+  if (body.format === 'html') {
+    const html = buildDocumentHtml({ markdown, settings, assets, mode: body.mode === 'preview' ? 'preview' : 'pdf', title: requestedName });
+    return new NextResponse(html, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders } });
+  }
 
-    // Create the complete HTML document with custom styling
-    const styledHtml = generateStyledHtml(html, theme, paperSize);
+  try {
+    const started = Date.now();
+    const { pdf, title } = await renderPdf({ markdown, settings, assets, title: requestedName });
+    const fileName = safeFileName(requestedName || title);
+    const disposition = body.inline ? 'inline' : 'attachment';
 
-    // Generate PDF
-    const pdf = await generatePdf(styledHtml, paperSize);
-
-    // Create response with proper headers including CORS
     return new NextResponse(pdf, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Length': pdf.length.toString(),
-        'Content-Disposition': 'attachment; filename="document.pdf"',
-        'Cache-Control': 'no-cache',
-        ...corsHeaders
+        'Content-Length': String(pdf.length),
+        'Content-Disposition': `${disposition}; filename="${fileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+        'Cache-Control': 'no-store',
+        'X-Render-Time': String(Date.now() - started),
+        ...corsHeaders,
       },
     });
-
   } catch (error) {
-    console.error('PDF generation error:', {
-      message: error.message,
-      stack: error.stack,
-      code: error.code,
-      syscall: error.syscall,
-      errno: error.errno
-    });
+    console.error('[api/convert] PDF generation failed:', error);
+    const hint = /Could not find|executablePath|Failed to launch|spawn/i.test(error.message)
+      ? 'The PDF engine (Chromium) could not be started. Install Google Chrome locally or set PUPPETEER_EXECUTABLE_PATH.'
+      : /timeout/i.test(error.message)
+        ? 'Rendering timed out. Very large documents or slow remote images can cause this — try again or remove heavy images.'
+        : 'An unexpected error occurred while rendering the PDF.';
 
-    let errorMessage = 'An unexpected error occurred during PDF generation.';
-    let errorType = 'UNKNOWN_ERROR';
-
-    if (error.code === 'Unknown system error -8') {
-      errorMessage = `Failed to spawn Chromium process. This might be due to:
-        1. Insufficient system permissions
-        2. Memory constraints
-        3. Incompatible Chromium version (currently using v133)
-        4. System resource limitations`;
-      errorType = 'CHROMIUM_SPAWN_ERROR';
-    } else if (error.code === 'ENOENT') {
-      errorMessage = 'Required file or directory not found. Check if Chromium is properly installed.';
-      errorType = 'FILE_NOT_FOUND';
-    } else if (error instanceof SyntaxError) {
-      errorMessage = 'Invalid JSON input received.';
-      errorType = 'INVALID_INPUT';
-    }
-
-    return NextResponse.json({
-      error: errorMessage,
-      type: errorType,
-      details: {
-        originalError: error.message,
-        code: error.code,
-        syscall: error.syscall,
-        timestamp: new Date().toISOString()
-      }
-    }, { status: 500, headers: corsHeaders });
+    return NextResponse.json(
+      { error: hint, details: process.env.NODE_ENV === 'development' ? error.message : undefined },
+      { status: 500, headers: corsHeaders },
+    );
   }
 }

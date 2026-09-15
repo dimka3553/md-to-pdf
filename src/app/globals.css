@@ -1,11 +1,82 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
 
-/* You can add any additional global styles here if needed */
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dbe6fe;
+  --color-brand-200: #bfd3fe;
+  --color-brand-300: #93b4fd;
+  --color-brand-400: #6090fa;
+  --color-brand-500: #3b6cf6;
+  --color-brand-600: #2553eb;
+  --color-brand-700: #1d40d8;
+  --color-brand-800: #1e36af;
+  --color-brand-900: #1e328a;
+}
 
-/* Example: Ensure body takes full height */
-/* html, body {
-  height: 100%;
+:root {
+  color-scheme: light;
+  --app-bg: #f4f5f7;
+  --panel-bg: #ffffff;
+  --panel-border: #e5e7eb;
+  --text: #111827;
+  --text-muted: #6b7280;
+}
+
+.dark {
+  color-scheme: dark;
+  --app-bg: #0b0f17;
+  --panel-bg: #111827;
+  --panel-border: #1f2937;
+  --text: #e5e7eb;
+  --text-muted: #9ca3af;
+}
+
+html, body { height: 100%; }
+body {
   margin: 0;
-  padding: 0;
-} */
+  background: var(--app-bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+/* Thin, unobtrusive scrollbars */
+* { scrollbar-width: thin; scrollbar-color: rgba(120, 128, 140, .35) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: rgba(120, 128, 140, .35); border-radius: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* CodeMirror sizing */
+.cm-editor { height: 100%; outline: none !important; }
+.cm-scroller { overflow: auto; }
+.cm-editor .cm-content { padding: 20px 0 40vh; }
+.cm-editor .cm-line { padding: 0 24px; }
+.cm-editor .cm-gutters { border-right: none; }
+
+/* Slim range input */
+input[type="range"] { accent-color: var(--color-brand-600); }
+
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+.toast-enter { animation: toast-in .18s ease-out; }
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(6px) scale(.985); } to { opacity: 1; transform: none; } }
+.fade-in { animation: fade-in .15s ease-out; }
+.pop-in { animation: pop-in .18s cubic-bezier(.2,.8,.2,1); }
+
+/* Checkerboard behind transparent logos */
+.checker {
+  background-image:
+    linear-gradient(45deg, rgba(0,0,0,.06) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(0,0,0,.06) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(0,0,0,.06) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(0,0,0,.06) 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+}
