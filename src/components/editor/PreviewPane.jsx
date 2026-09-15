@@ -28,17 +28,30 @@ export default function PreviewPane({ markdown, settings, assets, fileName, pdf,
     }
   }, [markdown, settings, assets, fileName]);
 
+  const htmlRef = useRef(html);
+  htmlRef.current = html;
+  const paintedRef = useRef('');
+
   // Write the document into the frame rather than using `srcdoc`. Chromium tries to restore
   // dynamically-inserted srcdoc frames from session history on reload, and when the attribute
   // is not there yet the frame resolves to the parent's URL — the whole app would render inside
   // its own preview. An `about:blank` frame that we write into has no URL to restore.
-  useEffect(() => {
+  const paintPreview = useCallback(() => {
     const doc = iframeRef.current?.contentDocument;
     if (!doc) return;
+    const next = htmlRef.current;
+    // about:blank (or a browser reset) has an empty body — rewrite even if we already
+    // painted this HTML once. A completed document with the same HTML is a no-op.
+    if (paintedRef.current === next && doc.body?.childElementCount > 0) return;
+    paintedRef.current = next;
     doc.open();
-    doc.write(html);
+    doc.write(next);
     doc.close();
-  }, [html]);
+  }, []);
+
+  useEffect(() => {
+    paintPreview();
+  }, [html, paintPreview]);
 
   // Messages from the preview document: readiness/page count, and scroll position
   // (remembered so the next re-render can restore it).
@@ -122,6 +135,7 @@ export default function PreviewPane({ markdown, settings, assets, fileName, pdf,
                 title="Document preview"
                 sandbox="allow-scripts allow-same-origin"
                 className="block border-0 bg-transparent"
+                onLoad={paintPreview}
                 style={{
                   width: sheetWidth,
                   height: `${100 / effectiveScale}%`,

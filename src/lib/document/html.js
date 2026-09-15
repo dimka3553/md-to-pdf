@@ -28,17 +28,21 @@ export function buildDocumentHtml({ markdown, settings: rawSettings, assets = {}
   const logo = settings.logo;
   const logoPx = logo ? LOGO_SIZES[logo.size].px : 0;
   const logoImg = (cls, h) => (logo ? `<img class="${cls}" src="${logo.dataUrl}" alt="" style="height:${h}px">` : '');
+  // Cover already has its own title (and optional logo). Don't also pin a logo to the in-body H1.
+  const placeTitleLogo = logo && !settings.cover.enabled;
 
-  if (logo && logo.position === 'title-right') {
+  if (placeTitleLogo && logo.position === 'title-right') {
     let replaced = false;
     body = body.replace(/<h1\b([^>]*)>([\s\S]*?)<\/h1>/, (m, attrs, inner) => {
       replaced = true;
       return `<div class="title-block"><h1${attrs}>${inner}</h1>${logoImg('title-logo', logoPx)}</div>`;
     });
     if (!replaced) body = `<div class="title-block"><h1>${escapeHtml(docTitle)}</h1>${logoImg('title-logo', logoPx)}</div>${body}`;
-  } else if (logo && logo.position === 'title-above') {
+  } else if (placeTitleLogo && logo.position === 'title-above') {
     body = logoImg('logo-above', logoPx) + body;
   }
+
+  if (settings.cover.enabled) body = stripLeadingTitle(body);
 
   // ---- Table of contents -----------------------------------------------------------------
   if (settings.toc) {
@@ -67,7 +71,7 @@ export function buildDocumentHtml({ markdown, settings: rawSettings, assets = {}
       <h1 class="cover-title">${escapeHtml(coverTitle)}</h1>
       ${c.subtitle ? `<p class="cover-subtitle">${escapeHtml(c.subtitle)}</p>` : ''}
       <div class="cover-rule"></div>
-    </section>`;
+    </section>${isPreview ? '<div class="page-break"></div>' : ''}`;
   }
 
   const needsMermaid = body.includes('class="mermaid"');
@@ -83,7 +87,7 @@ export function buildDocumentHtml({ markdown, settings: rawSettings, assets = {}
   const watermark = logo && logo.position === 'watermark' ? `<div class="watermark"><img src="${logo.dataUrl}" alt=""></div>` : '';
 
   return `<!DOCTYPE html>
-<html lang="en"${t.dark ? ' data-dark' : ''}>
+<html lang="en" data-md2pdf="1"${t.dark ? ' data-dark' : ''}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -125,6 +129,7 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
   }
   var GUTTER = 28, runningOffset = ${Math.round(design.margins.y * 0.55)};
   var perPage = pageH - padTop - padBottom;
+  var pageBreaks = ${JSON.stringify(settings.pageBreaks)};
   var doc = document.querySelector('.doc');
 
   function cleanupPagination() {
@@ -134,6 +139,7 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
   }
   function keepTogether(el, h) {
     if (h > perPage * 0.9) return false;
+    if (el.classList.contains('cover') || el.classList.contains('toc-page')) return false;
     if (/^H[1-6]$/.test(el.tagName) || el.classList.contains('title-block')) return true;
     if (el.matches('figure, blockquote, .markdown-alert, hr, .logo-above')) return true;
     if (el.classList.contains('code-block')) return (parseInt(el.getAttribute('data-lines'), 10) || 99) <= 28;
@@ -160,7 +166,12 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
       if (el.classList.contains('page-break')) { forceBreak = true; continue; }
       var base = docTop(), r = el.getBoundingClientRect();
       var top = r.top - base, bottom = r.bottom - base, h = bottom - top;
-      var startsNewPage = forceBreak || top >= limit - 0.5;
+      var headingBreak = pageBreaks === 'h2'
+        ? (el.tagName === 'H1' || el.tagName === 'H2' || el.classList.contains('title-block'))
+        : pageBreaks === 'h1'
+          ? (el.tagName === 'H1' || el.classList.contains('title-block'))
+          : false;
+      var startsNewPage = forceBreak || top >= limit - 0.5 || (headingBreak && top > pageTop + 1);
 
       if (!startsNewPage && bottom > limit + 0.5 && keepTogether(el, h) && top > pageTop + 1) startsNewPage = true;
 
@@ -193,6 +204,8 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
         i--; // re-evaluate this block on the new page
         continue;
       }
+
+      if (el.classList.contains('cover') || el.classList.contains('toc-page')) forceBreak = true;
 
       // Block flows across page boundaries (long list / table / code): mark each split point.
       while (bottom > limit + 0.5) {
@@ -247,6 +260,16 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
 </script>
 </body>
 </html>`;
+}
+
+/** Remove the leading document title so a cover page can own it. */
+function stripLeadingTitle(body) {
+  let html = body.replace(/^\s*<img class="logo-above"[^>]*>\s*/, '');
+  const titleBlock = html.match(/^\s*<div class="title-block">[\s\S]*?<\/div>\s*/);
+  if (titleBlock) return html.slice(titleBlock[0].length);
+  const h1 = html.match(/^\s*<h1\b[\s\S]*?<\/h1>\s*/);
+  if (h1) return html.slice(h1[0].length);
+  return html;
 }
 
 /** Place HTML after the title row (logo + h1), never inside the title flex box. */

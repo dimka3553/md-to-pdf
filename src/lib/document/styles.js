@@ -180,8 +180,6 @@ export function buildStyles(design, settings, mode) {
     .heading-number { color: ${t.accent}; font-weight: 600; margin-right: .35em; font-variant-numeric: tabular-nums; }
     ${settings.pageBreaks !== 'auto' && !isPreview ? `.doc h1:not(:first-child):not(.cover-title) { break-before: page; page-break-before: always; }` : ''}
     ${settings.pageBreaks === 'h2' && !isPreview ? `.doc h2 { break-before: page; page-break-before: always; }` : ''}
-    ${settings.pageBreaks !== 'auto' && isPreview ? `.doc h1:not(:first-child):not(.cover-title) { border-top: 1px dashed ${t.border}; padding-top: 1.5em; }` : ''}
-    ${settings.pageBreaks === 'h2' && isPreview ? `.doc h2 { border-top: 1px dashed ${t.border}; padding-top: 1.2em; }` : ''}
     .title-block + h2, h1 + h2, .toc + h2 { margin-top: 1em; }
 
     /* ---------- Text ---------- */

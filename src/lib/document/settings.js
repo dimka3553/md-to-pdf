@@ -229,7 +229,7 @@ export function normalizeSettings(input) {
   return {
     theme: pick(s.theme, THEMES, d.theme),
     font: s.font === 'inherit' || !s.font ? 'inherit' : pick(s.font, FONTS, 'inherit'),
-    headingFont: s.headingFont === 'inherit' || !s.headingFont ? 'inherit' : pick(s.headingFont, FONTS, 'inherit'),
+    headingFont: s.headingFont === 'inherit' || !s.headingFont ? 'inherit' : s.headingFont === 'same' ? 'same' : pick(s.headingFont, FONTS, 'inherit'),
     fontSize: pick(s.fontSize, FONT_SIZES, d.fontSize),
     accentColor: accent,
     paperSize: pick(s.paperSize, PAPER_SIZES, d.paperSize),
