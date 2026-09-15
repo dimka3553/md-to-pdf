@@ -60,7 +60,8 @@ export function buildStyles(design, settings, mode) {
     }
     .running.top { top: ${Math.round(my * 0.55)}px; }
     .running.bottom { bottom: ${Math.round(my * 0.55)}px; }
-    .running img { height: 16px; width: auto; display: block; }
+    .running-brand { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
+    .running img { height: 16px; width: auto; display: block; flex-shrink: 0; }
     .running .hint { font-size: 7pt; opacity: .55; font-style: italic; }
     /* A block that flows across pages (long table/list): dashed line where the PDF will split it. */
     .page-guide {
@@ -117,14 +118,15 @@ export function buildStyles(design, settings, mode) {
     /* ---------- Cover ---------- */
     .cover {
       display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
-      gap: .6em; text-align: left; position: relative;
+      gap: .6em; text-align: left; position: relative; min-width: 0; max-width: 100%;
     }
-    .cover .cover-logo { height: 64px; width: auto; margin-bottom: 2.5em; }
-    .cover .cover-kicker { font-size: .8em; letter-spacing: .14em; text-transform: uppercase; color: ${t.accent}; font-weight: 600; }
+    .cover .cover-logo { height: 64px; width: auto; max-width: 100%; margin-bottom: 2.5em; }
+    .cover .cover-kicker { font-size: .8em; letter-spacing: .14em; text-transform: uppercase; color: ${t.accent}; font-weight: 600; max-width: 90%; }
     .cover h1.cover-title {
-      font-size: 3.2em; line-height: 1.08; margin: 0; padding: 0; border: 0; letter-spacing: -.02em; max-width: 90%;
+      font-size: 3.2em; line-height: 1.08; margin: 0; padding: 0; border: 0; letter-spacing: -.02em;
+      width: 90%; max-width: 100%; min-width: 0; white-space: normal; overflow-wrap: break-word; hyphens: manual;
     }
-    .cover .cover-subtitle { font-size: 1.35em; color: ${t.muted}; margin: .3em 0 0; max-width: 80%; line-height: 1.4; }
+    .cover .cover-subtitle { font-size: 1.35em; color: ${t.muted}; margin: .3em 0 0; width: 80%; max-width: 100%; min-width: 0; line-height: 1.4; }
     .cover .cover-rule { width: 64px; height: 4px; background: ${t.accent}; border-radius: 2px; margin: 1.6em 0; }
     .cover .cover-meta { font-size: .95em; color: ${t.muted}; display: flex; flex-direction: column; gap: .25em; }
     .cover .cover-meta strong { color: ${t.text}; font-weight: 600; }
@@ -133,7 +135,7 @@ export function buildStyles(design, settings, mode) {
     .title-block { display: flex; align-items: center; justify-content: space-between; gap: 1.5em; margin-bottom: 1.2em; padding-bottom: .6em; border-bottom: 2px solid ${t.accent}; break-after: avoid; }
     .title-block h1 { flex: 1; min-width: 0; margin: 0; padding: 0; border: 0; }
     .title-block .title-logo { flex-shrink: 0; display: block; width: auto; }
-    .logo-above { display: block; width: auto; margin: 0 0 1.4em; }
+    .logo-above { display: block; width: auto; max-width: 100%; margin: 0 0 1.4em; }
 
     /* ---------- Table of contents ---------- */
     .toc { margin: 0 0 2.2em; padding: 1.1em 1.4em; border: 1px solid ${t.border}; border-radius: 8px; background: ${t.quoteBackground}; break-inside: avoid; }

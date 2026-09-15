@@ -279,10 +279,10 @@ function runningContent(settings, docTitle) {
 /** HTML for the simulated header/footer bands shown in the live preview. */
 function runningParts(settings, design, docTitle) {
   const r = runningContent(settings, docTitle);
-  const logoImg = r.headerLogo ? `<img src="${r.headerLogo.dataUrl}" alt="" style="height:${HEADER_LOGO_HEIGHT}px;width:auto;vertical-align:middle;margin-right:8px">` : '';
+  const logoImg = r.headerLogo ? `<img src="${r.headerLogo.dataUrl}" alt="" style="height:${HEADER_LOGO_HEIGHT}px;width:auto">` : '';
   const pageNumber = r.pageNumbers ? (r.pageNumbers === 'n' ? '<span class="pageNumber">1</span>' : '<span class="pageNumber">1</span> / <span class="totalPages">N</span>') : '';
   return {
-    headerLeft: `<span>${logoImg}${escapeHtml(r.headerText)}</span>`,
+    headerLeft: `<span class="running-brand">${logoImg}${escapeHtml(r.headerText)}</span>`,
     headerRight: `<span>${escapeHtml(r.dateText)}</span>`,
     footerLeft: `<span>${escapeHtml(r.footerText)}</span>`,
     footerRight: `<span>${pageNumber}</span>`,
@@ -333,7 +333,7 @@ function buildPageCss(settings, design, docTitle) {
     size: ${settings.paperSize} ${settings.orientation};
     margin: ${top}px ${x}px ${bottom}px ${x}px;
     background: ${t.background};
-    ${box('top-left', headerLeft, 'text-align: left;')}
+    ${box('top-left', headerLeft, `text-align: left; line-height: ${HEADER_LOGO_HEIGHT}px;`)}
     ${box('top-right', headerRight, 'text-align: right;')}
     ${box('bottom-left', footerLeft, 'text-align: left;')}
     ${box(footerLeft ? 'bottom-right' : 'bottom-center', pageCounter, (footerLeft ? 'text-align: right;' : 'text-align: center;') + ' font-variant-numeric: tabular-nums;')}
