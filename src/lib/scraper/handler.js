@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
 import { corsHeaders } from '../cors.js';
-import { scrapePage, validateUrl, sanitizeUrl } from './scraper.js';
+import { describeScrapeError, parseFlag, scrapePage, validateUrl, sanitizeUrl } from './scraper.js';
 
 /**
  * Shared GET handler for /api/scrape (markdown) and /api/scrapehtml (html).
- * Response shape is kept backwards compatible with the original API.
+ *
+ *   GET /api/scrape?url=https://…[&images=false][&links=false]
+ *
+ * Response shape is kept backwards compatible with the original API; the
+ * `page` object gained `description`, `siteName`, `author`, `published` and
+ * `canonical`, and `metadata` reports the options that were applied.
  */
 export function createScrapeHandler(format) {
   return async function GET(request) {
@@ -23,24 +28,25 @@ export function createScrapeHandler(format) {
     }
     if (!validateUrl(sanitizedUrl)) return error(400, 'Invalid url format');
 
+    const options = {
+      stripImages: !parseFlag(searchParams.get('images'), true),
+      stripLinks: !parseFlag(searchParams.get('links'), true),
+    };
+
     try {
-      const { content, title } = await scrapePage(sanitizedUrl, format);
+      const { content, ...meta } = await scrapePage(sanitizedUrl, format, options);
       return NextResponse.json(
         {
           status: 'Ok',
-          page: { url: sanitizedUrl, title, content },
-          metadata: { duration: Date.now() - startTime, timestamp: new Date().toISOString() },
+          page: { url: sanitizedUrl, ...meta, content },
+          metadata: { format: format === 'md' ? 'markdown' : 'html', options, duration: Date.now() - startTime, timestamp: new Date().toISOString() },
         },
         { status: 200, headers: corsHeaders },
       );
     } catch (err) {
       console.error(`[scrape:${format}] ${sanitizedUrl}:`, err.message);
-      const msg = err.message || '';
-      if (msg.includes('Failed to load page')) return error(502, `Failed to load the webpage: ${msg}`);
-      if (/timeout/i.test(msg)) return error(504, 'The webpage took too long to load.');
-      if (msg.includes('No content could be extracted')) return error(422, 'No readable content found on the webpage.');
-      if (/Could not find|executablePath|Failed to launch/i.test(msg)) return error(500, 'The browser engine could not be started.');
-      return error(500, 'An unexpected error occurred during scraping.');
+      const { status, message } = describeScrapeError(err);
+      return error(status, message);
     }
   };
 }

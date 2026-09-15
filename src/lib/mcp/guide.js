@@ -8,7 +8,7 @@
 
 import { ARGUMENT_CATALOG } from './arguments.js';
 
-export const GUIDE_VERSION = '1.1.0';
+export const GUIDE_VERSION = '1.2.0';
 
 export const MARKDOWN_GUIDE = `# Writing Markdown for Markdown Studio
 
@@ -19,7 +19,7 @@ front-matter, custom CSS) does **not**.
 ## Workflow
 
 1. Read this guide once (you are doing that now).
-2. Pick a starting point: \`list_templates\` → \`get_template\` gives you proven structure **and** matching design settings for reports, proposals, READMEs, meeting notes, invoices and résumés.
+2. Pick a starting point: \`list_templates\` → \`get_template\` gives you proven structure **and** matching design settings for reports, proposals, READMEs, meeting notes, invoices and résumés. If the source is a web page, call \`import_web_page\` with the URL instead — it returns clean Markdown, metadata and an analysis; never retype page content from memory.
 3. Write the Markdown. One \`#\` title, \`##\` sections, short paragraphs, generous use of tables, callouts and code blocks.
 4. Run \`analyze_markdown\` — it returns the outline plus warnings (skipped heading levels, code fences without a language, YAML front-matter, missing images, ragged tables…). Fix everything it reports.
 5. If the user asked for a nice PDF, tell them the design knobs (theme, paper, TOC, cover, header/footer, fonts) and agree a \`settings\` object — the full argument list is at the end of this guide.
@@ -198,6 +198,7 @@ Every nested field, enum, default and tool argument is listed at the end of this
 - **Meeting notes** — \`forest\`, \`header.showDate\`; Attendees line, Agenda (ordered list), Discussion (\`###\` per item), Decisions (✅/⏸ bullets), Action items (task list with **Owner** in bold and a due date).
 - **Invoice** — \`mono\`, page numbers off, footer "Thank you for your business."; key–value table for From/To/Dates, items table with right-aligned amounts, totals table, payment details.
 - **Résumé / CV** — \`clean\`, \`fontSize: "sm"\`, \`margins: "narrow"\`, page numbers off; name as H1, one-line contact row, \`##\` per section, \`###\` per role with an \`*italic*\` dates line.
+- **Web page / article** — \`import_web_page\` first; \`editorial\` for long-form, \`clean\` + \`toc\` for docs; \`header.text\` = site name, page numbers on; keep the page title as the single H1, remove leftover "share"/"related" fragments, close with a *Source: <url>* footnote.
 
 ## Anti-patterns (these render badly)
 

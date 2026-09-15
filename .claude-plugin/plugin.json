@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "author": {
     "name": "Markdown Studio",
-    "url": "https://md-to-pdf.vercel.app"
+    "url": "https://md.dima.ua"
   },
-  "homepage": "https://md-to-pdf.vercel.app",
+  "homepage": "https://md.dima.ua",
   "repository": "https://github.com/dimka3553/md-to-pdf",
   "license": "MIT",
   "keywords": ["markdown", "pdf", "documents", "formatting", "mcp", "writing", "reports", "export"]

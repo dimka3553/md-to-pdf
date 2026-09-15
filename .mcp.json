@@ -2,7 +2,7 @@
   "mcpServers": {
     "markdown-studio": {
       "type": "http",
-      "url": "https://md-to-pdf.vercel.app/api/mcp"
+      "url": "https://md.dima.ua/api/mcp"
     }
   }
 }

@@ -13,13 +13,15 @@
  *  Goose    goose://extension?type=streamable_http&url=…&id=…&name=…&description=…
  */
 
+import { SITE_URL as DEFAULT_SITE_URL } from './site.js';
+
 export const SERVER_NAME = 'markdown-studio';
 export const SERVER_TITLE = 'Markdown Studio';
 export const SERVER_DESCRIPTION = 'Write well-formatted Markdown and export polished PDFs';
 
 /** The MCP endpoint for the current deployment. */
 export function mcpUrl(origin) {
-  const base = (origin || process.env.NEXT_PUBLIC_SITE_URL || 'https://md-to-pdf.vercel.app').replace(/\/$/, '');
+  const base = (origin || DEFAULT_SITE_URL).replace(/\/$/, '');
   return `${base}/api/mcp`;
 }
 

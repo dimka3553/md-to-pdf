@@ -69,4 +69,7 @@ export const Keyboard = make(<><path d="M10 8h.01" /><path d="M12 12h.01" /><pat
 export const Bot = make(<><path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" /></>);
 export const Terminal = make(<><polyline points="4 17 10 11 4 5" /><line x1="12" x2="20" y1="19" y2="19" /></>);
 export const Plug = make(<><path d="M12 22v-5" /><path d="M9 8V2" /><path d="M15 8V2" /><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z" /></>);
+export const Clock = make(<><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>);
+export const History = make(<><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></>);
+export const ArrowRight = make(<><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></>);
 export const ExternalLink = make(<><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></>);

@@ -34,7 +34,7 @@ A Markdown editor that exports polished, print-ready PDFs — with a live previe
 Markdown Studio ships a remote **MCP server** so coding agents (Cursor, Claude Code, Claude Desktop, VS Code Copilot, Codex, ChatGPT, …) can write better-formatted Markdown and export PDFs directly:
 
 ```
-https://md-to-pdf.vercel.app/api/mcp
+https://md.dima.ua/api/mcp
 ```
 
 Streamable HTTP, stateless, no sign-up. It teaches the agent the exact syntax this renderer supports, lints the document, and renders it.
@@ -52,20 +52,20 @@ Also exposed: resources `markdown-studio://guide`, `markdown-studio://design-opt
 
 ### Connect
 
-The quickest way: click **Add to AI agent** in the app's top bar (or open [md-to-pdf.vercel.app/#add-to-agent](https://md-to-pdf.vercel.app/#add-to-agent)), pick your agent, and it opens the app with the server pre-configured (Cursor, VS Code, Goose) or gives you the exact command / snippet (Claude Code, Codex, Gemini CLI, Claude Desktop, ChatGPT, Windsurf).
+The quickest way: click **Add to AI agent** in the app's top bar (or open [md.dima.ua/#add-to-agent](https://md.dima.ua/#add-to-agent)), pick your agent, and it opens the app with the server pre-configured (Cursor, VS Code, Goose) or gives you the exact command / snippet (Claude Code, Codex, Gemini CLI, Claude Desktop, ChatGPT, Windsurf).
 
 Manual options:
 
-**Cursor** — [Add to Cursor](cursor://anysphere.cursor-deeplink/mcp/install?name=markdown-studio&config=eyJ1cmwiOiJodHRwczovL21kLXRvLXBkZi52ZXJjZWwuYXBwL2FwaS9tY3AifQ==) or put this in `.cursor/mcp.json` (project) / `~/.cursor/mcp.json` (global):
+**Cursor** — [Add to Cursor](cursor://anysphere.cursor-deeplink/mcp/install?name=markdown-studio&config=eyJ1cmwiOiJodHRwczovL21kLmRpbWEudWEvYXBpL21jcCJ9) or put this in `.cursor/mcp.json` (project) / `~/.cursor/mcp.json` (global):
 
 ```json
-{ "mcpServers": { "markdown-studio": { "url": "https://md-to-pdf.vercel.app/api/mcp" } } }
+{ "mcpServers": { "markdown-studio": { "url": "https://md.dima.ua/api/mcp" } } }
 ```
 
 **Claude Code**
 
 ```bash
-claude mcp add --transport http markdown-studio https://md-to-pdf.vercel.app/api/mcp
+claude mcp add --transport http markdown-studio https://md.dima.ua/api/mcp
 ```
 
 **Claude Desktop / ChatGPT / other remote-MCP clients** — add a custom connector with the URL above.
@@ -73,17 +73,17 @@ claude mcp add --transport http markdown-studio https://md-to-pdf.vercel.app/api
 **VS Code** (`.vscode/mcp.json`)
 
 ```json
-{ "servers": { "markdown-studio": { "type": "http", "url": "https://md-to-pdf.vercel.app/api/mcp" } } }
+{ "servers": { "markdown-studio": { "type": "http", "url": "https://md.dima.ua/api/mcp" } } }
 ```
 
 **Codex CLI** (`~/.codex/config.toml`)
 
 ```toml
 [mcp_servers.markdown-studio]
-url = "https://md-to-pdf.vercel.app/api/mcp"
+url = "https://md.dima.ua/api/mcp"
 ```
 
-**stdio-only clients** — bridge with [`mcp-remote`](https://www.npmjs.com/package/mcp-remote): `npx -y mcp-remote https://md-to-pdf.vercel.app/api/mcp`.
+**stdio-only clients** — bridge with [`mcp-remote`](https://www.npmjs.com/package/mcp-remote): `npx -y mcp-remote https://md.dima.ua/api/mcp`.
 
 ### Install as a plugin
 

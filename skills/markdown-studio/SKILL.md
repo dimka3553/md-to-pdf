@@ -3,32 +3,33 @@ name: markdown-studio
 description: Write well-formatted Markdown documents and export them as polished PDFs with Markdown Studio. Use when asked to write, format, polish or export a report, proposal, README, meeting notes, invoice, résumé or any document destined for PDF/print, or when Markdown must render correctly in Markdown Studio (md-to-pdf).
 ---
 
-<!-- Generated from src/lib/mcp/guide.js (v1.1.0) by scripts/build-skill.mjs — do not edit by hand. -->
+<!-- Generated from src/lib/mcp/guide.js (v1.2.0) by scripts/build-skill.mjs — do not edit by hand. -->
 
 ## Tooling
 
-Markdown Studio exposes a remote MCP server at `https://md-to-pdf.vercel.app/api/mcp` (Streamable HTTP, no auth by default). If it is connected, prefer its tools over guessing:
+Markdown Studio exposes a remote MCP server at `https://md.dima.ua/api/mcp` (Streamable HTTP, no auth by default). If it is connected, prefer its tools over guessing:
 
 | Tool | Use it to |
 | --- | --- |
 | `get_markdown_guide` | Read the full authoring guide **and** every tool/settings argument (same content as below) |
 | `list_templates` / `get_template` | Start from a proven structure with matching design settings |
 | `list_design_options` | JSON of every valid `settings` value (themes, fonts, paper, …) — relay these when the user wants a nice PDF |
+| `import_web_page` | Turn a public URL into clean Markdown + metadata + analysis (`url`, `format`, `stripImages`, `stripLinks`) |
 | `analyze_markdown` | Lint before rendering; fix every warning it reports |
 | `render_html` | Quick standalone HTML preview (`markdown`, `settings`, `assets`, `fileName`) |
 | `render_pdf` | Final PDF as a base64 `application/pdf` resource (same arguments as `render_html`) |
 
-Prompts: `write_document`, `polish_markdown`, `make_pdf` (walk through every design argument, then render).
+Prompts: `write_document`, `polish_markdown`, `make_pdf` (walk through every design argument, then render), `pdf_from_url` (import a page, clean it up, render).
 
-Without the MCP server you can still POST `{"markdown","settings","fileName"}` to `https://md-to-pdf.vercel.app/api/convert` and save the PDF response body.
+Without the MCP server you can still POST `{"markdown","settings","fileName"}` to `https://md.dima.ua/api/convert` and save the PDF response body, and `GET https://md.dima.ua/api/scrape?url=…` to import a web page as Markdown.
 
 To connect the MCP server in Cursor add to `.cursor/mcp.json`:
 
 ```json
-{ "mcpServers": { "markdown-studio": { "url": "https://md-to-pdf.vercel.app/api/mcp" } } }
+{ "mcpServers": { "markdown-studio": { "url": "https://md.dima.ua/api/mcp" } } }
 ```
 
-In Claude Code: `claude mcp add --transport http markdown-studio https://md-to-pdf.vercel.app/api/mcp`
+In Claude Code: `claude mcp add --transport http markdown-studio https://md.dima.ua/api/mcp`
 
 ---
 
@@ -41,7 +42,7 @@ front-matter, custom CSS) does **not**.
 ## Workflow
 
 1. Read this guide once (you are doing that now).
-2. Pick a starting point: `list_templates` → `get_template` gives you proven structure **and** matching design settings for reports, proposals, READMEs, meeting notes, invoices and résumés.
+2. Pick a starting point: `list_templates` → `get_template` gives you proven structure **and** matching design settings for reports, proposals, READMEs, meeting notes, invoices and résumés. If the source is a web page, call `import_web_page` with the URL instead — it returns clean Markdown, metadata and an analysis; never retype page content from memory.
 3. Write the Markdown. One `#` title, `##` sections, short paragraphs, generous use of tables, callouts and code blocks.
 4. Run `analyze_markdown` — it returns the outline plus warnings (skipped heading levels, code fences without a language, YAML front-matter, missing images, ragged tables…). Fix everything it reports.
 5. If the user asked for a nice PDF, tell them the design knobs (theme, paper, TOC, cover, header/footer, fonts) and agree a `settings` object — the full argument list is at the end of this guide.
@@ -220,6 +221,7 @@ Every nested field, enum, default and tool argument is listed at the end of this
 - **Meeting notes** — `forest`, `header.showDate`; Attendees line, Agenda (ordered list), Discussion (`###` per item), Decisions (✅/⏸ bullets), Action items (task list with **Owner** in bold and a due date).
 - **Invoice** — `mono`, page numbers off, footer "Thank you for your business."; key–value table for From/To/Dates, items table with right-aligned amounts, totals table, payment details.
 - **Résumé / CV** — `clean`, `fontSize: "sm"`, `margins: "narrow"`, page numbers off; name as H1, one-line contact row, `##` per section, `###` per role with an `*italic*` dates line.
+- **Web page / article** — `import_web_page` first; `editorial` for long-form, `clean` + `toc` for docs; `header.text` = site name, page numbers on; keep the page title as the single H1, remove leftover "share"/"related" fragments, close with a *Source: <url>* footnote.
 
 ## Anti-patterns (these render badly)
 
@@ -291,6 +293,19 @@ Returns the Markdown skeleton and the `settings` it was designed with. Pass thos
 
 Fix every `"warning"` before rendering. `"info"` items are suggestions.
 
+### `import_web_page`
+
+Loads a public web page in headless Chromium (3–20 s), removes navigation, ads, scripts and sidebars, keeps the main article and converts it to Markdown with absolute links and images. Returns a summary (metadata, stats, warnings), a `structuredContent` object (`url`, `title`, `description`, `siteName`, `author`, `published`, `canonical`, `fileName`, `stats`, `outline`, `warnings`) and the content as an embedded `text/markdown` (or `text/html`) resource.
+
+| Argument | Required | Meaning |
+| --- | --- | --- |
+| `url` | yes | Public http(s) URL of the page to import (max 2048 chars). "https://" is assumed when the scheme is missing. localhost and private-network hosts are rejected. |
+| `format` | no | "markdown" (default) converts the main content to GitHub-flavoured Markdown and runs analyze_markdown on it; "html" returns the cleaned HTML fragment instead. |
+| `stripImages` | no | Remove every image from the result. Default false. Use when the page is image-heavy or the images are decorative. |
+| `stripLinks` | no | Replace hyperlinks with their text (images are kept). Default false. Handy for print where links are not clickable anyway. |
+
+Use it whenever the user hands you a URL. Then polish the Markdown (fix the reported warnings, delete leftover "share"/"related" fragments, add a source footnote) and pass it to `render_pdf`. Without MCP the same import is `GET /api/scrape?url=…&images=true&links=true` (or `/api/scrapehtml`).
+
 ### `render_pdf` / `render_html`
 
 Same arguments. `render_pdf` uses headless Chromium (3–15 s) and returns a base64 `application/pdf` resource. `render_html` is fast and returns standalone HTML with the same CSS.
@@ -318,7 +333,7 @@ Every key is optional. Unknown keys are ignored. Nested objects are merged field
 | `margins` | enum | `normal` | Page margins: "narrow" (Narrow), "normal" (Normal), "wide" (Wide). Default "normal". |
 | `background` | enum | `none` | Subtle full-page texture: "none" (None), "soft" (Soft tint), "gradient" (Gradient), "dots" (Dots), "grid" (Grid), "lines" (Ruled lines). Default "none". |
 | `pageBreaks` | enum | `auto` | Pagination: "auto" (Automatic), "h1" (Before each H1), "h2" (Before each H1 & H2). Default "auto". |
-| `toc` | boolean | false | Insert a generated table of contents from ## / ### after the title. Default false. Do not write a TOC by hand. |
+| `toc` | boolean | false | Insert a generated table of contents from ## / ### (after the title, or on its own page when a cover is on). Default false. Do not write a TOC by hand. |
 | `headingNumbers` | boolean | false | Auto-number H1–H3 as 1 / 1.1 / 1.1.1. Default false. Do not number headings by hand. |
 | `justify` | boolean | false | Justify body paragraphs. Default false. |
 | `header` | object | see below | Running header. Partial object is fine. |
@@ -450,6 +465,14 @@ Placeholders: `{title}` in `header.text` / `footer.text` becomes the document ti
 | `brief` | no | What to write if there is no Markdown yet. |
 | `markdown` | no | Existing Markdown to render. |
 | `audience` | no | Who will read it (affects theme and density recommendations). |
+
+**`pdf_from_url`**
+
+| Argument | Required | Meaning |
+| --- | --- | --- |
+| `url` | yes | The public web page to import. |
+| `audience` | no | Who will read the PDF (affects theme and density recommendations). |
+| `notes` | no | What to keep, drop or change during clean-up. |
 
 Limits: Markdown ≤ 2 MB; 24 images; 3 MB per image; 8 MB images combined.
 

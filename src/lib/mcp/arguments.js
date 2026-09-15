@@ -96,6 +96,10 @@ export const FIELD_HELP = {
     .join(', ')}. Default "md".`,
   logoAspect: 'width / height of the image, used when the logo is drawn in the page header. Optional; default 1.',
   templateId: `Template id: ${quoted(TEMPLATE_IDS)}.`,
+  url: 'Public http(s) URL of the page to import (max 2048 chars). "https://" is assumed when the scheme is missing. localhost and private-network hosts are rejected.',
+  importFormat: '"markdown" (default) converts the main content to GitHub-flavoured Markdown and runs analyze_markdown on it; "html" returns the cleaned HTML fragment instead.',
+  stripImages: 'Remove every image from the result. Default false. Use when the page is image-heavy or the images are decorative.',
+  stripLinks: 'Replace hyperlinks with their text (images are kept). Default false. Handy for print where links are not clickable anyway.',
 };
 
 /** Human-readable catalog for server instructions, get_markdown_guide, and the skill. */
@@ -197,6 +201,19 @@ Returns the Markdown skeleton and the \`settings\` it was designed with. Pass th
 | \`assets\` | no | ${FIELD_HELP.assets} |
 
 Fix every \`"warning"\` before rendering. \`"info"\` items are suggestions.
+
+### \`import_web_page\`
+
+Loads a public web page in headless Chromium (3–20 s), removes navigation, ads, scripts and sidebars, keeps the main article and converts it to Markdown with absolute links and images. Returns a summary (metadata, stats, warnings), a \`structuredContent\` object (\`url\`, \`title\`, \`description\`, \`siteName\`, \`author\`, \`published\`, \`canonical\`, \`fileName\`, \`stats\`, \`outline\`, \`warnings\`) and the content as an embedded \`text/markdown\` (or \`text/html\`) resource.
+
+| Argument | Required | Meaning |
+| --- | --- | --- |
+| \`url\` | yes | ${FIELD_HELP.url} |
+| \`format\` | no | ${FIELD_HELP.importFormat} |
+| \`stripImages\` | no | ${FIELD_HELP.stripImages} |
+| \`stripLinks\` | no | ${FIELD_HELP.stripLinks} |
+
+Use it whenever the user hands you a URL. Then polish the Markdown (fix the reported warnings, delete leftover "share"/"related" fragments, add a source footnote) and pass it to \`render_pdf\`. Without MCP the same import is \`GET /api/scrape?url=…&images=true&links=true\` (or \`/api/scrapehtml\`).
 
 ### \`render_pdf\` / \`render_html\`
 
@@ -312,6 +329,14 @@ Placeholders: \`{title}\` in \`header.text\` / \`footer.text\` becomes the docum
 | \`brief\` | no | What to write if there is no Markdown yet. |
 | \`markdown\` | no | Existing Markdown to render. |
 | \`audience\` | no | Who will read it (affects theme and density recommendations). |
+
+**\`pdf_from_url\`**
+
+| Argument | Required | Meaning |
+| --- | --- | --- |
+| \`url\` | yes | The public web page to import. |
+| \`audience\` | no | Who will read the PDF (affects theme and density recommendations). |
+| \`notes\` | no | What to keep, drop or change during clean-up. |
 
 Limits: Markdown ≤ ${MAX_MARKDOWN_BYTES / (1024 * 1024)} MB; ${MAX_ASSETS} images; ${MAX_ASSET_BYTES / (1024 * 1024)} MB per image; ${MAX_TOTAL_ASSET_BYTES / (1024 * 1024)} MB images combined.
 `;

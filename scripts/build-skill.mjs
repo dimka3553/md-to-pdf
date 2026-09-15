@@ -11,7 +11,8 @@ import { MARKDOWN_GUIDE, GUIDE_VERSION } from '../src/lib/mcp/guide.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const out = resolve(root, 'skills/markdown-studio/SKILL.md');
-const MCP_URL = 'https://md-to-pdf.vercel.app/api/mcp';
+const ORIGIN = 'https://md.dima.ua';
+const MCP_URL = `${ORIGIN}/api/mcp`;
 
 const frontmatter = `---
 name: markdown-studio
@@ -30,13 +31,14 @@ Markdown Studio exposes a remote MCP server at \`${MCP_URL}\` (Streamable HTTP, 
 | \`get_markdown_guide\` | Read the full authoring guide **and** every tool/settings argument (same content as below) |
 | \`list_templates\` / \`get_template\` | Start from a proven structure with matching design settings |
 | \`list_design_options\` | JSON of every valid \`settings\` value (themes, fonts, paper, …) — relay these when the user wants a nice PDF |
+| \`import_web_page\` | Turn a public URL into clean Markdown + metadata + analysis (\`url\`, \`format\`, \`stripImages\`, \`stripLinks\`) |
 | \`analyze_markdown\` | Lint before rendering; fix every warning it reports |
 | \`render_html\` | Quick standalone HTML preview (\`markdown\`, \`settings\`, \`assets\`, \`fileName\`) |
 | \`render_pdf\` | Final PDF as a base64 \`application/pdf\` resource (same arguments as \`render_html\`) |
 
-Prompts: \`write_document\`, \`polish_markdown\`, \`make_pdf\` (walk through every design argument, then render).
+Prompts: \`write_document\`, \`polish_markdown\`, \`make_pdf\` (walk through every design argument, then render), \`pdf_from_url\` (import a page, clean it up, render).
 
-Without the MCP server you can still POST \`{"markdown","settings","fileName"}\` to \`https://md-to-pdf.vercel.app/api/convert\` and save the PDF response body.
+Without the MCP server you can still POST \`{"markdown","settings","fileName"}\` to \`${ORIGIN}/api/convert\` and save the PDF response body, and \`GET ${ORIGIN}/api/scrape?url=…\` to import a web page as Markdown.
 
 To connect the MCP server in Cursor add to \`.cursor/mcp.json\`:
 

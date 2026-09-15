@@ -18,9 +18,11 @@ import { inferTitle } from '../document/utils.js';
 import { assertMarkdownSize, sanitizeAssets, safeFileName } from '../document/limits.js';
 import { TEMPLATES, getTemplate } from '../templates.js';
 import { renderPdf } from '../pdf/generate.js';
+import { describeScrapeError, sanitizeUrl, scrapePage, validateUrl } from '../scraper/scraper.js';
 import { analyzeMarkdown } from './analyze.js';
 import { ARGUMENT_CATALOG, FIELD_HELP, TEMPLATE_IDS } from './arguments.js';
 import { GUIDE_VERSION, MARKDOWN_GUIDE } from './guide.js';
+import { SITE_URL } from '../site.js';
 
 export const SERVER_INFO = { name: 'markdown-studio', version: GUIDE_VERSION };
 
@@ -36,9 +38,9 @@ Recommended flow:
 5. Call render_pdf (PDF as a base64 resource) or render_html.
 All tools are stateless; pass the full markdown each time.
 
-${ARGUMENT_CATALOG}`;
+When the source is a web page (an article, docs page, blog post, changelog…), call import_web_page with the URL first: it loads the page in a headless browser, strips navigation/ads and returns clean Markdown plus an analysis. Then polish that Markdown (fix the warnings) and render it — do not re-type page content from memory.
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://md-to-pdf.vercel.app';
+${ARGUMENT_CATALOG}`;
 
 const keys = (o) => Object.keys(o);
 
@@ -109,6 +111,8 @@ const AssetsSchema = z
 const MarkdownSchema = z.string().min(1).max(2 * 1024 * 1024).describe(FIELD_HELP.markdown);
 
 const FileNameSchema = z.string().max(120).optional().describe(FIELD_HELP.fileName);
+
+const UrlSchema = z.string().min(1).max(2048).describe(FIELD_HELP.url);
 
 // ---- Helpers -----------------------------------------------------------------------------------
 
@@ -338,6 +342,75 @@ export function registerMarkdownStudio(server) {
     },
   );
 
+  server.registerTool(
+    'import_web_page',
+    {
+      title: 'Import web page as Markdown',
+      description:
+        'Fetch a public web page in headless Chromium (3–20 s), strip navigation, ads, scripts and sidebars, keep the main article and convert it to GitHub-flavoured Markdown with absolute links and images (or return the cleaned HTML). Also returns page metadata (title, description, site, author, date) and, for Markdown, the same analysis as analyze_markdown (outline, stats, warnings). Use it whenever the user gives you a URL to turn into a document or PDF, then fix the warnings and call render_pdf. Only http(s) URLs to public hosts are allowed; pages behind a login cannot be read.',
+      inputSchema: z.object({
+        url: UrlSchema,
+        format: z.enum(['markdown', 'html']).optional().describe(FIELD_HELP.importFormat),
+        stripImages: z.boolean().optional().describe(FIELD_HELP.stripImages),
+        stripLinks: z.boolean().optional().describe(FIELD_HELP.stripLinks),
+      }),
+      annotations: { readOnlyHint: true, idempotentHint: false, openWorldHint: true },
+    },
+    async ({ url, format = 'markdown', stripImages = false, stripLinks = false }) => {
+      let target = String(url).trim();
+      if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(target)) target = `https://${target}`;
+      try {
+        target = sanitizeUrl(target);
+      } catch (err) {
+        return toolError(`Invalid URL: ${err.message}`);
+      }
+      if (!validateUrl(target)) return toolError('Only public http(s) URLs can be imported (no localhost or private network addresses).');
+
+      const started = Date.now();
+      try {
+        const { content, ...meta } = await scrapePage(target, format === 'html' ? 'html' : 'md', { stripImages, stripLinks });
+        const seconds = ((Date.now() - started) / 1000).toFixed(1);
+        const host = new URL(target).hostname.replace(/^www\./, '');
+        const baseName = safeFileName(meta.title || host, format === 'html' ? 'html' : 'md');
+        const resource = {
+          type: 'resource',
+          resource: { uri: `markdown-studio://import/${encodeURIComponent(baseName)}`, mimeType: format === 'html' ? 'text/html' : 'text/markdown', text: content },
+        };
+
+        if (format === 'html') {
+          return {
+            content: [text(`Imported "${meta.title || target}" from ${host} as HTML (${(Buffer.byteLength(content, 'utf8') / 1024).toFixed(1)} KB in ${seconds}s). The cleaned HTML follows as an embedded resource.`), resource],
+            structuredContent: { url: target, format: 'html', ...meta, bytes: Buffer.byteLength(content, 'utf8'), durationMs: Date.now() - started },
+          };
+        }
+
+        const report = analyzeMarkdown(content);
+        const warnings = report.warnings.filter((w) => w.severity === 'warning').length;
+        const infos = report.warnings.length - warnings;
+        const summary = [
+          `Imported "${meta.title || target}" from ${host} in ${seconds}s — ${report.stats.words.toLocaleString()} words, ${report.outline.length} headings, ${report.stats.images} images, ${report.stats.tables} tables, ${report.stats.codeBlocks} code blocks.`,
+          meta.description ? `Description: ${meta.description}` : '',
+          meta.author || meta.published ? `Byline: ${[meta.author, meta.published].filter(Boolean).join(' · ')}` : '',
+          report.warnings.length ? `analyze_markdown found ${warnings} warning(s) and ${infos} suggestion(s) — fix the warnings before rendering:` : 'analyze_markdown found no issues.',
+          ...report.warnings.slice(0, 12).map((w) => `- [${w.severity}] ${w.line ? `line ${w.line}: ` : ''}${w.message}`),
+          report.warnings.length > 12 ? `- … ${report.warnings.length - 12} more (call analyze_markdown for the full list)` : '',
+          '',
+          `Suggested fileName: "${baseName.replace(/\.md$/, '')}". The Markdown follows as an embedded resource; keep the source URL as a footnote or a closing "Source" line when you render it.`,
+        ]
+          .filter(Boolean)
+          .join('\n');
+
+        return {
+          content: [text(summary), resource],
+          structuredContent: { url: target, format: 'markdown', ...meta, fileName: baseName.replace(/\.md$/, ''), stats: report.stats, outline: report.outline, warnings: report.warnings, durationMs: Date.now() - started },
+        };
+      } catch (err) {
+        console.error('[mcp] import_web_page failed:', err.message);
+        return toolError(describeScrapeError(err).message);
+      }
+    },
+  );
+
   // ---- Resources -----------------------------------------------------------------------------
 
   server.registerResource(
@@ -436,6 +509,44 @@ export function registerMarkdownStudio(server) {
               markdown,
               '```',
             ].join('\n'),
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
+    'pdf_from_url',
+    {
+      title: 'PDF from a web page',
+      description: 'Import a web page with import_web_page, clean up the Markdown, agree design settings, and render it as a PDF.',
+      argsSchema: z.object({
+        url: z.string().describe('The public web page to import (article, docs page, blog post…).'),
+        audience: z.string().optional().describe('Who will read the PDF — used to recommend theme, density and paper.'),
+        notes: z.string().optional().describe('Anything to keep, drop or change (e.g. "drop the comments section", "add a summary at the top").'),
+      }),
+    },
+    ({ url, audience, notes }) => ({
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: [
+              `Turn this web page into a polished PDF with Markdown Studio: ${url}`,
+              audience ? `Audience: ${audience}` : '',
+              notes ? `Notes: ${notes}` : '',
+              '',
+              'Steps:',
+              '1. Call import_web_page with the URL (format "markdown"). Read the returned metadata, outline and warnings.',
+              '2. Clean the Markdown without changing its meaning: keep a single H1 (the page title), remove leftover navigation/"share"/"related" fragments, fix skipped heading levels, add languages to code fences, turn "Note:"-style paragraphs into callouts, and drop broken or tracking links. Keep images that carry information; drop decorative ones.',
+              '3. Add a closing line or footnote with the source URL and the import date.',
+              '4. Run analyze_markdown until there are no warnings.',
+              '5. Tell the user the design settings you propose (theme, paper, TOC, header/footer with the site name, page numbers) — pick "clean" + toc for docs, "editorial" for long-form articles — and apply what they confirm.',
+              '6. Call render_pdf with markdown + settings + fileName (use the suggested fileName) and report the result.',
+            ]
+              .filter(Boolean)
+              .join('\n'),
           },
         },
       ],

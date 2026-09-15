@@ -1,6 +1,5 @@
 import EditorApp from '@/components/editor/EditorApp';
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://md-to-pdf.vercel.app';
+import { SITE_URL } from '@/lib/site';
 
 const structuredData = {
   '@context': 'https://schema.org',
