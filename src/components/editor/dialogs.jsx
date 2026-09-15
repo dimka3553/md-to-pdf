@@ -4,6 +4,7 @@ import { useState } from 'react';
 import * as I from '../icons';
 import { Button, Dialog, Input, Kbd, cx } from '../ui';
 import { TEMPLATES } from '@/lib/templates';
+import { fetchImport, normalizeUrl } from '@/lib/client/scraper';
 
 export function ImportUrlDialog({ open, onClose, onImport }) {
   const [url, setUrl] = useState('');
@@ -13,21 +14,18 @@ export function ImportUrlDialog({ open, onClose, onImport }) {
 
   const submit = async (e) => {
     e?.preventDefault();
-    let target = url.trim();
-    if (!target) return;
-    if (!/^https?:\/\//i.test(target)) target = `https://${target}`;
+    if (!url.trim()) return;
+    let target;
     try {
-      new URL(target);
-    } catch {
-      setError('Enter a valid web address.');
+      target = normalizeUrl(url);
+    } catch (err) {
+      setError(err.message);
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/scrape?url=${encodeURIComponent(target)}`);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.status !== 'Ok') throw new Error(data.message || `Request failed (${res.status})`);
+      const data = await fetchImport({ url: target, format: 'markdown' });
       onImport({ markdown: data.page.content, title: data.page.title, url: target, replace });
       setUrl('');
       onClose();
@@ -46,6 +44,9 @@ export function ImportUrlDialog({ open, onClose, onImport }) {
       description="We fetch the page, strip navigation and ads, and convert the main content to Markdown."
       footer={
         <>
+          <a href={url.trim() ? `/scraper?url=${encodeURIComponent(url.trim())}` : '/scraper'} className="mr-auto inline-flex items-center gap-1 text-xs text-gray-500 hover:text-brand-600">
+            More options <I.ExternalLink className="h-3 w-3" />
+          </a>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button variant="primary" onClick={submit} disabled={loading || !url.trim()}>
             {loading ? <I.Spinner className="h-4 w-4" /> : <I.Globe className="h-4 w-4" />}

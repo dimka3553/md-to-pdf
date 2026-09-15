@@ -70,6 +70,10 @@ input[type="range"] { accent-color: var(--color-brand-600); }
 .fade-in { animation: fade-in .15s ease-out; }
 .pop-in { animation: pop-in .18s cubic-bezier(.2,.8,.2,1); }
 
+/* Indeterminate progress bar (web page import) */
+@keyframes progress-slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+.progress-bar { animation: progress-slide 1.4s cubic-bezier(.4,0,.2,1) infinite; }
+
 /* Checkerboard behind transparent logos */
 .checker {
   background-image:

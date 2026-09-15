@@ -19,6 +19,7 @@ import { WELCOME_DOCUMENT, getTemplate } from '@/lib/templates';
 import { useDebouncedValue, useIsMac, useMediaQuery, usePersistentState, useShortcuts } from '@/lib/client/hooks';
 import { fileToDataUrl, uniqueAssetName } from '@/lib/client/images';
 import { insertImage, replaceDocument } from '@/lib/client/editorCommands';
+import { takeHandoff } from '@/lib/client/scraper';
 
 const MarkdownEditor = dynamic(() => import('./MarkdownEditor'), {
   ssr: false,
@@ -135,8 +136,20 @@ function Editor() {
     return () => window.removeEventListener('hashchange', check);
   }, []);
 
-  // Legacy ?content= parameter from the scraper page
+  // Document handed over from /scraper ("Open in editor" / "Append"), plus the legacy ?content= parameter.
   useEffect(() => {
+    const handoff = takeHandoff();
+    if (handoff) {
+      const label = handoff.source?.title || handoff.source?.url || handoff.fileName;
+      if (handoff.mode === 'append') {
+        setDoc((d) => ({ ...d, markdown: d.markdown.trim() ? `${d.markdown.trimEnd()}\n\n---\n\n${handoff.markdown}` : handoff.markdown }));
+        toast.success(`Appended “${label}” to the document.`);
+      } else {
+        setDoc({ markdown: handoff.markdown, fileName: handoff.fileName });
+        toast.success(`Imported “${label}”.`, { action: { label: 'Import another page', onClick: () => setDialog('import') } });
+      }
+      return;
+    }
     const params = new URLSearchParams(window.location.search);
     const content = params.get('content');
     if (content) {
@@ -494,7 +507,7 @@ function Editor() {
         <div className="flex items-center gap-3">
           <span className="hidden md:inline">Autosaved in this browser</span>
           <a href="/scraper" className="hidden items-center gap-1 hover:text-gray-800 sm:inline-flex dark:hover:text-gray-200">
-            <I.Globe className="h-3 w-3" /> Web scraper
+            <I.Globe className="h-3 w-3" /> Import from URL
           </a>
           <button type="button" onClick={() => setDialog('shortcuts')} className="inline-flex items-center gap-1 hover:text-gray-800 dark:hover:text-gray-200">
             <I.Keyboard className="h-3 w-3" /> Shortcuts

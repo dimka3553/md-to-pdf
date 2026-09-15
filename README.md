@@ -44,11 +44,12 @@ Streamable HTTP, stateless, no sign-up. It teaches the agent the exact syntax th
 | `get_markdown_guide` | The authoring guide: supported syntax, structure rules, design settings, recipes per document type, anti-patterns |
 | `list_design_options` | Every valid `settings` value (themes with colours/fonts, paper sizes, margins, backgrounds, …) |
 | `list_templates` / `get_template` | Starter documents (report, proposal, README, meeting notes, invoice, résumé) with matching settings |
+| `import_web_page` | Turn a public URL into clean Markdown (or HTML): rendered in headless Chromium (JavaScript executed, lazy content scrolled in), chrome stripped using the rendered layout, tables/code/callouts/figures preserved, absolute links, page metadata and the same analysis as `analyze_markdown`. Options `format`, `stripImages`, `stripLinks` |
 | `analyze_markdown` | Linter: outline, stats and line-numbered warnings (skipped heading levels, fences without a language, YAML front-matter, LaTeX, raw HTML, ragged tables, missing assets, undefined footnotes…) |
 | `render_html` | Standalone HTML with the same CSS as the PDF (fast, no browser) |
-| `render_pdf` | The PDF, returned as a base64 `application/pdf` embedded resource |
+| `render_pdf` | The PDF, returned as a base64 `application/pdf` embedded resource. The server instructs the agent to save it and open it inline immediately (in Cursor: a canvas embedding the PDF) rather than in an external viewer |
 
-Also exposed: resources `markdown-studio://guide`, `markdown-studio://design-options`, `markdown-studio://templates/{id}` and prompts `write_document`, `polish_markdown`.
+Also exposed: resources `markdown-studio://guide`, `markdown-studio://design-options`, `markdown-studio://templates/{id}` and prompts `write_document`, `polish_markdown`, `make_pdf`, `pdf_from_url` (import a page → clean up → render).
 
 ### Connect
 
@@ -154,10 +155,14 @@ Options: `"inline": true` returns `Content-Disposition: inline`; `"format": "htm
 
 ### `GET /api/scrape?url=…` and `GET /api/scrapehtml?url=…`
 
-Fetches a web page in headless Chromium, strips navigation/ads and returns the main content as Markdown or HTML:
+Renders a web page in headless Chromium — waiting for client-side JavaScript and scrolling so lazy-loaded sections mount — then uses the rendered layout (computed styles, geometry) to drop hidden elements, fixed banners, navigation and sidebars, and converts what is actually visible, in reading order, to GitHub-flavoured Markdown or cleaned HTML. Tables keep inline code, code blocks keep their language, docs-style admonitions become `> [!NOTE]` alerts, figures keep captions, KaTeX/MathJax becomes `$…$`. Optional `images=false` drops images and `links=false` replaces hyperlinks with their text. The same importer powers the **Import from URL** page (`/scraper`, deep-linkable as `/scraper?url=…`) and the `import_web_page` MCP tool.
 
 ```json
-{ "status": "Ok", "page": { "url": "…", "title": "…", "content": "…" }, "metadata": { "duration": 1234, "timestamp": "…" } }
+{
+  "status": "Ok",
+  "page": { "url": "…", "title": "…", "description": "…", "siteName": "…", "author": "…", "published": "…", "canonical": "…", "content": "…" },
+  "metadata": { "format": "markdown", "options": { "stripImages": false, "stripLinks": false }, "duration": 1234, "timestamp": "…" }
+}
 ```
 
 ## Project layout

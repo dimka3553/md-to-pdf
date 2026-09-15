@@ -1,5 +1,5 @@
 import { buildDocumentHtml, buildPdfPageOptions } from '../document/html.js';
-import { launchBrowser } from './browser.js';
+import { withBrowser } from './browser.js';
 
 /**
  * Render markdown + settings to a PDF buffer.
@@ -10,8 +10,8 @@ export async function renderPdf({ markdown, settings, assets, title }) {
   const html = buildDocumentHtml({ markdown, settings, assets, mode: 'pdf', title });
   const pageOptions = buildPdfPageOptions(settings, markdown, title);
 
-  const browser = await launchBrowser();
-  try {
+  // withBrowser closes Chromium and removes its temp profile/socket directories afterwards.
+  return withBrowser(async (browser) => {
     const page = await browser.newPage();
     await page.emulateMediaType('print');
 
@@ -33,7 +33,5 @@ export async function renderPdf({ markdown, settings, assets, title }) {
     });
 
     return { pdf: Buffer.from(pdf), title: pageOptions.title };
-  } finally {
-    await browser.close().catch(() => {});
-  }
+  });
 }

@@ -36,6 +36,7 @@ Recommended flow:
 3. Agree settings with the user (or apply the matching recipe if they want you to decide).
 4. Write the Markdown, then call analyze_markdown and fix every warning.
 5. Call render_pdf (PDF as a base64 resource) or render_html.
+6. Immediately save the PDF and open it for the user inside the client's own inline surface (in Cursor: a canvas embedding the PDF) — never in an external viewer or browser, and without asking first. Details under "After rendering" below.
 All tools are stateless; pass the full markdown each time.
 
 When the source is a web page (an article, docs page, blog post, changelog…), call import_web_page with the URL first: it loads the page in a headless browser, strips navigation/ads and returns clean Markdown plus an analysis. Then polish that Markdown (fix the warnings) and render it — do not re-type page content from memory.
@@ -299,7 +300,7 @@ export function registerMarkdownStudio(server) {
     {
       title: 'Render PDF',
       description:
-        'Render Markdown + settings to a PDF with headless Chromium (takes 3–15 s). Arguments: markdown (required), settings (optional design object — every field is documented on the schema and in get_markdown_guide), assets (optional image data URLs), fileName (optional, no extension). The PDF is returned as a base64 `application/pdf` embedded resource — decode it and write it to disk (e.g. `base64 -d`). If you have shell access and want to skip base64, POST {"markdown","settings","assets","fileName"} to /api/convert on the same host and save the response body. Run analyze_markdown first and fix its warnings. When the user asked for a nice PDF, confirm or report the settings you used.',
+        'Render Markdown + settings to a PDF with headless Chromium (takes 3–15 s). Arguments: markdown (required), settings (optional design object — every field is documented on the schema and in get_markdown_guide), assets (optional image data URLs), fileName (optional, no extension). The PDF is returned as a base64 `application/pdf` embedded resource — decode it and write it to disk (e.g. `base64 -d`). If you have shell access and want to skip base64, POST {"markdown","settings","assets","fileName"} to /api/convert on the same host and save the response body. Run analyze_markdown first and fix its warnings. As soon as this tool returns, save the file and open the PDF for the user inside the client\'s own inline surface (Cursor: a canvas with an <iframe> whose src is the data:application/pdf;base64 blob) — automatically, never in a system viewer or browser, and without asking. Then confirm or report the settings you used.',
       inputSchema: renderInput,
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
     },
@@ -324,11 +325,12 @@ export function registerMarkdownStudio(server) {
             text(
               `Rendered "${name}" — ${kb} KB in ${seconds}s (theme "${normalized.theme}", ${normalized.paperSize} ${normalized.orientation}${normalized.toc ? ', TOC' : ''}${normalized.cover.enabled ? ', cover page' : ''}). ` +
                 `The PDF is attached as a base64 application/pdf resource; decode it to save the file. ` +
+                `Now open it for the user right away — inside the client's own inline surface (Cursor: create a canvas that embeds this blob and shows it with <iframe src="data:application/pdf;base64,…">), not in a system viewer or browser, and without asking first. ` +
                 `Direct download alternative: POST the same JSON to ${publicOrigin(ctx)}/api/convert.`,
             ),
             { type: 'resource', resource: { uri: `markdown-studio://render/${encodeURIComponent(name)}`, mimeType: 'application/pdf', blob: pdf.toString('base64') } },
           ],
-          structuredContent: { fileName: name, bytes: pdf.length, renderMs: Date.now() - started, title, settings: normalized },
+          structuredContent: { fileName: name, bytes: pdf.length, renderMs: Date.now() - started, title, settings: normalized, openInline: true },
         };
       } catch (error) {
         console.error('[mcp] render_pdf failed:', error);
@@ -347,7 +349,7 @@ export function registerMarkdownStudio(server) {
     {
       title: 'Import web page as Markdown',
       description:
-        'Fetch a public web page in headless Chromium (3–20 s), strip navigation, ads, scripts and sidebars, keep the main article and convert it to GitHub-flavoured Markdown with absolute links and images (or return the cleaned HTML). Also returns page metadata (title, description, site, author, date) and, for Markdown, the same analysis as analyze_markdown (outline, stats, warnings). Use it whenever the user gives you a URL to turn into a document or PDF, then fix the warnings and call render_pdf. Only http(s) URLs to public hosts are allowed; pages behind a login cannot be read.',
+        'Render a public web page in headless Chromium (5–25 s) — waiting for its JavaScript, scrolling so lazy-loaded sections appear — then strip navigation, ads, banners and sidebars using the rendered layout, keep the visible content in reading order and convert it to GitHub-flavoured Markdown: headings, nested/task lists, tables (inline code preserved), fenced code with language, callouts as "> [!NOTE]" alerts, figures with captions, definition lists, math as $…$, absolute links and images (or return the cleaned HTML). Also returns page metadata (title, description, site, author, date, language) and, for Markdown, the same analysis as analyze_markdown (outline, stats, warnings). Use it whenever the user gives you a URL to turn into a document or PDF, then fix the warnings and call render_pdf. Only http(s) URLs to public hosts are allowed; pages behind a login or bot protection cannot be read.',
       inputSchema: z.object({
         url: UrlSchema,
         format: z.enum(['markdown', 'html']).optional().describe(FIELD_HELP.importFormat),
@@ -475,7 +477,7 @@ export function registerMarkdownStudio(server) {
               '- Do not write a manual table of contents or number headings by hand; use settings.toc / settings.headingNumbers.',
               '- Tell the user the design settings you will use (theme, paper, TOC, cover, header/footer) so they can change them; every argument is in get_markdown_guide / server instructions.',
               '- Run analyze_markdown and fix every warning before rendering.',
-              '- Finish by calling render_pdf with the chosen settings and report the file name.',
+              '- Finish by calling render_pdf with the chosen settings, then immediately open the PDF inline for the user (Cursor: a canvas embedding it — not an external viewer) and report the file name.',
             ].join('\n'),
           },
         },
@@ -543,7 +545,7 @@ export function registerMarkdownStudio(server) {
               '3. Add a closing line or footnote with the source URL and the import date.',
               '4. Run analyze_markdown until there are no warnings.',
               '5. Tell the user the design settings you propose (theme, paper, TOC, header/footer with the site name, page numbers) — pick "clean" + toc for docs, "editorial" for long-form articles — and apply what they confirm.',
-              '6. Call render_pdf with markdown + settings + fileName (use the suggested fileName) and report the result.',
+              '6. Call render_pdf with markdown + settings + fileName (use the suggested fileName), then immediately open the PDF inline for the user (Cursor: a canvas embedding it — not an external viewer) and report the result.',
             ]
               .filter(Boolean)
               .join('\n'),
@@ -584,7 +586,7 @@ export function registerMarkdownStudio(server) {
               '- Chrome: header.text, header.showDate, footer.text, footer.pageNumbers, footer.pageNumberStyle, logo',
               '- Output: fileName; optional assets for local images',
               'Recommend a recipe for this document type, apply what they confirm (or your recommendation if they want you to decide).',
-              'Follow the authoring guide. Run analyze_markdown and fix warnings. Call render_pdf with markdown + settings + assets + fileName. Tell them the file name and which settings you used.',
+              'Follow the authoring guide. Run analyze_markdown and fix warnings. Call render_pdf with markdown + settings + assets + fileName, then immediately open the PDF inline for the user (Cursor: a canvas embedding it — never an external viewer, never ask first). Tell them the file name and which settings you used.',
             ]
               .filter(Boolean)
               .join('\n'),

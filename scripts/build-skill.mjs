@@ -34,7 +34,7 @@ Markdown Studio exposes a remote MCP server at \`${MCP_URL}\` (Streamable HTTP, 
 | \`import_web_page\` | Turn a public URL into clean Markdown + metadata + analysis (\`url\`, \`format\`, \`stripImages\`, \`stripLinks\`) |
 | \`analyze_markdown\` | Lint before rendering; fix every warning it reports |
 | \`render_html\` | Quick standalone HTML preview (\`markdown\`, \`settings\`, \`assets\`, \`fileName\`) |
-| \`render_pdf\` | Final PDF as a base64 \`application/pdf\` resource (same arguments as \`render_html\`) |
+| \`render_pdf\` | Final PDF as a base64 \`application/pdf\` resource (same arguments as \`render_html\`). Save it and open it inline right away — in Cursor, a canvas embedding the PDF — never in an external viewer |
 
 Prompts: \`write_document\`, \`polish_markdown\`, \`make_pdf\` (walk through every design argument, then render), \`pdf_from_url\` (import a page, clean it up, render).
 

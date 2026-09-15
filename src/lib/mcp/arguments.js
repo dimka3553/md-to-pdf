@@ -102,6 +102,25 @@ export const FIELD_HELP = {
   stripLinks: 'Replace hyperlinks with their text (images are kept). Default false. Handy for print where links are not clickable anyway.',
 };
 
+/**
+ * What the agent must do the moment `render_pdf` returns. Shared by the server
+ * instructions, the authoring guide, the tool description/result and the skill
+ * so every surface gives the same answer: open the PDF inline, right away.
+ */
+export const OPEN_PDF_INSTRUCTIONS = `## After rendering: open the PDF immediately
+
+The moment \`render_pdf\` returns, show the PDF to the user — automatically, without being asked and without asking "shall I open it?". Never stop at "the PDF is ready" or a bare file path.
+
+1. **Save it.** Decode the base64 resource and write \`<fileName>.pdf\` next to the source Markdown (or where the user asked) so they keep the file.
+2. **Open it inside the client's own inline surface**, never in an external application:
+   - **Cursor:** create a canvas — one \`<file-name>.canvas.tsx\` in \`~/.cursor/projects/<workspace>/canvases/\` (follow the Cursor canvas skill). Inline the base64 blob from the tool result as a string constant and render it with \`<iframe src={"data:application/pdf;base64," + PDF_BASE64} title="<file name>" style={{ width: "100%", height: "100vh", border: 0 }} />\` (or \`<embed type="application/pdf">\`). The canvas must not \`fetch()\` or read files — the PDF has to be embedded. Keep it minimal: the viewer filling the pane plus a one-line header with the file name, paper size and theme. Link the canvas file in your reply so it opens beside the chat. If the host cannot display PDFs inline, call \`render_html\` with the same arguments and show that HTML in the same canvas via \`<iframe srcDoc={HTML} />\` — it uses the same CSS as the PDF.
+   - **Claude Desktop, ChatGPT and other clients with an artifact / preview pane:** put the PDF in that inline pane the same way.
+   - **No inline surface (plain CLI):** print the saved absolute path and stop.
+3. **Do not** launch a system viewer or browser (\`open\`, \`xdg-open\`, \`start\`, Preview, Acrobat, a new browser tab) — the user wants to see the PDF beside the chat, not in another window.
+4. After it is open, confirm the file name and the settings you used. When the user asks for changes, re-render and update the **same** canvas so the new PDF replaces the old one in place.
+
+\`render_html\` output should be shown the same way (canvas + \`<iframe srcDoc>\`), when the user asked to see it.`;
+
 /** Human-readable catalog for server instructions, get_markdown_guide, and the skill. */
 export function buildArgumentCatalog() {
   const themeTable = mdTable(
@@ -166,6 +185,8 @@ When someone asks you to make a nice PDF, tell them the knobs they can turn — 
 
 Recommend a starting set from the recipes (report → corporate + TOC + cover, README → clean + TOC, invoice → mono, and so on). If they say "just make it look good", apply the matching recipe and mention what you chose.
 
+${OPEN_PDF_INSTRUCTIONS}
+
 ## Tool arguments
 
 All tools are stateless. Pass the full Markdown every time.
@@ -204,7 +225,7 @@ Fix every \`"warning"\` before rendering. \`"info"\` items are suggestions.
 
 ### \`import_web_page\`
 
-Loads a public web page in headless Chromium (3–20 s), removes navigation, ads, scripts and sidebars, keeps the main article and converts it to Markdown with absolute links and images. Returns a summary (metadata, stats, warnings), a \`structuredContent\` object (\`url\`, \`title\`, \`description\`, \`siteName\`, \`author\`, \`published\`, \`canonical\`, \`fileName\`, \`stats\`, \`outline\`, \`warnings\`) and the content as an embedded \`text/markdown\` (or \`text/html\`) resource.
+Renders a public web page in headless Chromium (5–25 s) — waiting for JavaScript and scrolling so lazy-loaded content appears — removes navigation, ads, banners and sidebars based on the rendered layout, keeps the visible content in reading order and converts it to GitHub-flavoured Markdown (headings, lists, tables, fenced code with language, \`> [!NOTE]\` callouts, figures, math, absolute links and images). Returns a summary (metadata, stats, warnings), a \`structuredContent\` object (\`url\`, \`title\`, \`description\`, \`siteName\`, \`author\`, \`published\`, \`canonical\`, \`fileName\`, \`stats\`, \`outline\`, \`warnings\`) and the content as an embedded \`text/markdown\` (or \`text/html\`) resource.
 
 | Argument | Required | Meaning |
 | --- | --- | --- |
@@ -217,7 +238,7 @@ Use it whenever the user hands you a URL. Then polish the Markdown (fix the repo
 
 ### \`render_pdf\` / \`render_html\`
 
-Same arguments. \`render_pdf\` uses headless Chromium (3–15 s) and returns a base64 \`application/pdf\` resource. \`render_html\` is fast and returns standalone HTML with the same CSS.
+Same arguments. \`render_pdf\` uses headless Chromium (3–15 s) and returns a base64 \`application/pdf\` resource. \`render_html\` is fast and returns standalone HTML with the same CSS. As soon as \`render_pdf\` returns, save the file and open it inline for the user (Cursor: a canvas embedding the PDF) — see **After rendering** above.
 
 | Argument | Required | Meaning |
 | --- | --- | --- |

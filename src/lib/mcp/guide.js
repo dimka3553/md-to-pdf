@@ -8,7 +8,7 @@
 
 import { ARGUMENT_CATALOG } from './arguments.js';
 
-export const GUIDE_VERSION = '1.2.0';
+export const GUIDE_VERSION = '1.3.0';
 
 export const MARKDOWN_GUIDE = `# Writing Markdown for Markdown Studio
 
@@ -24,6 +24,7 @@ front-matter, custom CSS) does **not**.
 4. Run \`analyze_markdown\` — it returns the outline plus warnings (skipped heading levels, code fences without a language, YAML front-matter, missing images, ragged tables…). Fix everything it reports.
 5. If the user asked for a nice PDF, tell them the design knobs (theme, paper, TOC, cover, header/footer, fonts) and agree a \`settings\` object — the full argument list is at the end of this guide.
 6. Render with \`render_pdf\` (or \`render_html\` for a quick look). Pass \`markdown\`, \`settings\`, optional \`assets\` and \`fileName\`.
+7. **Open the PDF immediately** — save it, then show it inside the client's own inline surface (in Cursor: a canvas that embeds the PDF), never in an external viewer or browser, and without asking first. See *After rendering: open the PDF immediately* at the end of this guide.
 
 ## Document structure
 
