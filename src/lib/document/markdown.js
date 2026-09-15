@@ -1,7 +1,7 @@
 import { Marked } from 'marked';
 import markedFootnote from 'marked-footnote';
 import markedAlert from 'marked-alert';
-import { gfmHeadingId } from 'marked-gfm-heading-id';
+import GithubSlugger from 'github-slugger';
 import hljs from 'highlight.js/lib/common';
 import twemoji from 'twemoji';
 import { escapeHtml } from './utils.js';
@@ -81,9 +81,11 @@ function parseInfo(info) {
 export function createParser(opts = {}) {
   const assets = opts.assets || {};
   const counters = [0, 0, 0, 0, 0, 0];
+  // GitHub-style heading ids (used by the table of contents and in-document links).
+  // A fresh slugger per parser keeps duplicate-heading suffixes (-1, -2) isolated per document.
+  const slugger = new GithubSlugger();
 
   const marked = new Marked(
-    gfmHeadingId({ prefix: '' }),
     markedAlert(),
     markedFootnote({ footnoteDivider: true, description: 'Footnotes' }),
   );
@@ -112,13 +114,15 @@ export function createParser(opts = {}) {
 
       heading({ tokens, depth }) {
         const inner = this.parser.parseInline(tokens);
+        const plain = inner.replace(/<[^>]+>/g, '').replace(/&(amp|lt|gt|quot|#39|#039);/g, (m, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", '#039': "'" })[e]);
+        const id = slugger.slug(plain.trim().toLowerCase()) || `section-${depth}`;
         let prefix = '';
         if (opts.headingNumbers && depth <= 3) {
           counters[depth - 1] += 1;
           for (let i = depth; i < counters.length; i++) counters[i] = 0;
           prefix = `<span class="heading-number">${counters.slice(0, depth).join('.')}</span> `;
         }
-        return `<h${depth}>${prefix}${inner}</h${depth}>\n`;
+        return `<h${depth} id="${escapeHtml(id)}">${prefix}${inner}</h${depth}>\n`;
       },
 
       image({ href, title, text }) {
@@ -216,7 +220,7 @@ export function extractHeadings(html, maxDepth = 3) {
   let m;
   while ((m = re.exec(html))) {
     const depth = Number(m[1]);
-    if (depth > maxDepth) continue;
+    if (depth > maxDepth || m[2] === 'footnote-label') continue;
     const text = m[3]
       .replace(/<span class="heading-number">.*?<\/span>\s*/g, '')
       .replace(/<img[^>]*alt="([^"]*)"[^>]*>/g, '$1')

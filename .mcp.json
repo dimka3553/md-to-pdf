@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "markdown-studio": {
+      "type": "http",
+      "url": "https://md-to-pdf.vercel.app/api/mcp"
+    }
+  }
+}

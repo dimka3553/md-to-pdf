@@ -1,0 +1,15 @@
+{
+  "$schema": "https://code.claude.com/schemas/marketplace.json",
+  "name": "markdown-studio",
+  "owner": {
+    "name": "Markdown Studio",
+    "url": "https://md-to-pdf.vercel.app"
+  },
+  "plugins": [
+    {
+      "name": "markdown-studio",
+      "source": "./",
+      "description": "MCP server + skill for writing well-formatted Markdown and exporting polished PDFs"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "markdown-studio",
+  "description": "Write better-formatted Markdown and export print-ready PDFs. Remote MCP server (authoring guide, linter, templates, HTML/PDF rendering) plus an Agent Skill that teaches the supported syntax.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Markdown Studio",
+    "url": "https://md-to-pdf.vercel.app"
+  },
+  "homepage": "https://md-to-pdf.vercel.app",
+  "repository": "https://github.com/dimka3553/md-to-pdf",
+  "license": "MIT",
+  "keywords": ["markdown", "pdf", "documents", "formatting", "mcp", "writing", "reports", "export"]
+}

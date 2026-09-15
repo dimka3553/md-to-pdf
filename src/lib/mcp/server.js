@@ -1,0 +1,434 @@
+import { z } from 'zod';
+import { ResourceTemplate } from '@modelcontextprotocol/server';
+import {
+  BACKGROUNDS,
+  DEFAULT_SETTINGS,
+  FONTS,
+  FONT_SIZES,
+  LOGO_POSITIONS,
+  LOGO_SIZES,
+  MARGINS,
+  PAGE_BREAK_MODES,
+  PAPER_SIZES,
+  THEMES,
+  normalizeSettings,
+} from '../document/settings.js';
+import { buildDocumentHtml } from '../document/html.js';
+import { inferTitle } from '../document/utils.js';
+import { assertMarkdownSize, sanitizeAssets, safeFileName } from '../document/limits.js';
+import { TEMPLATES, getTemplate } from '../templates.js';
+import { renderPdf } from '../pdf/generate.js';
+import { analyzeMarkdown } from './analyze.js';
+import { GUIDE_VERSION, MARKDOWN_GUIDE } from './guide.js';
+
+export const SERVER_INFO = { name: 'markdown-studio', version: GUIDE_VERSION };
+
+export const SERVER_INSTRUCTIONS = `Markdown Studio turns Markdown into polished, print-ready PDFs (themes, cover page, table of contents, running header/footer, callouts, Mermaid diagrams, syntax-highlighted code).
+
+Recommended flow:
+1. Call get_markdown_guide once per session and follow it — it lists exactly which syntax renders and which does not (no LaTeX, no HTML layouts, no YAML front-matter).
+2. Optionally call list_templates / get_template for a proven structure and matching design settings.
+3. Write the Markdown, then call analyze_markdown and fix every warning.
+4. Call render_pdf (returns the PDF as a base64 resource) or render_html.
+All tools are stateless; pass the full markdown each time.`;
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://md-to-pdf.vercel.app';
+
+const keys = (o) => Object.keys(o);
+const listOf = (o) => keys(o).join(', ');
+
+// ---- Schemas -----------------------------------------------------------------------------------
+
+const HexColor = z.string().regex(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i, 'Use #rgb or #rrggbb');
+
+export const SettingsSchema = z
+  .object({
+    theme: z.enum(keys(THEMES)).describe(`Colour/typography theme: ${listOf(THEMES)}. Default "clean".`),
+    font: z.enum(['inherit', ...keys(FONTS)]).describe(`Body font. "inherit" uses the theme default. Options: ${listOf(FONTS)}.`),
+    headingFont: z.enum(['inherit', ...keys(FONTS)]).describe('Heading font; "inherit" uses the theme default.'),
+    fontSize: z.enum(keys(FONT_SIZES)).describe('sm = 9.5pt (dense), md = 10.5pt (default), lg = 12pt.'),
+    accentColor: HexColor.describe('Override the theme accent colour, e.g. "#0F4C81".'),
+    paperSize: z.enum(keys(PAPER_SIZES)).describe('A4 (default), Letter or Legal.'),
+    orientation: z.enum(['portrait', 'landscape']),
+    margins: z.enum(keys(MARGINS)).describe('narrow, normal (default) or wide.'),
+    background: z.enum(keys(BACKGROUNDS)).describe(`Subtle full-page background: ${listOf(BACKGROUNDS)}.`),
+    pageBreaks: z.enum(keys(PAGE_BREAK_MODES)).describe('auto (smart, default), h1 = new page before every H1, h2 = before every H1 and H2.'),
+    toc: z.boolean().describe('Insert a generated table of contents (H2/H3) after the title.'),
+    headingNumbers: z.boolean().describe('Number H1–H3 headings automatically (1, 1.1, 1.1.1).'),
+    justify: z.boolean().describe('Justify body text.'),
+    header: z
+      .object({
+        text: z.string().max(200).describe('Running header text; "{title}" is replaced with the document title.'),
+        showDate: z.boolean().describe('Show today\'s date on the right of the header.'),
+      })
+      .partial(),
+    footer: z
+      .object({
+        text: z.string().max(200).describe('Running footer text; supports "{title}".'),
+        pageNumbers: z.boolean().describe('Show page numbers (default true).'),
+        pageNumberStyle: z.enum(['n-of-total', 'n']).describe('"n-of-total" → "3 / 12", "n" → "3".'),
+      })
+      .partial(),
+    cover: z
+      .object({
+        enabled: z.boolean(),
+        title: z.string().max(300).describe('Defaults to the document H1.'),
+        subtitle: z.string().max(500),
+        author: z.string().max(200),
+        date: z.string().max(100),
+        showLogo: z.boolean(),
+      })
+      .partial(),
+    logo: z
+      .object({
+        dataUrl: z.string().startsWith('data:image/').describe('PNG/JPEG/SVG as a data URL.'),
+        name: z.string().max(200).optional(),
+        position: z.enum(keys(LOGO_POSITIONS)).describe(`${listOf(LOGO_POSITIONS)}.`),
+        size: z.enum(keys(LOGO_SIZES)).describe('sm (32px), md (48px), lg (72px).'),
+        aspect: z.number().positive().optional().describe('width / height of the logo image, used for header sizing.'),
+      })
+      .partial({ name: true, position: true, size: true, aspect: true })
+      .nullable()
+      .describe('Logo image and placement, or null.'),
+  })
+  .partial()
+  .describe('Document design settings. Every key is optional; see list_design_options for details.');
+
+const AssetsSchema = z
+  .record(z.string().max(200), z.string().startsWith('data:image/'))
+  .describe('Embedded images keyed by name, each a data URL (data:image/png;base64,…). Reference them in Markdown as ![alt](asset:name). Max 24 images, 3 MB each, 8 MB total.');
+
+const MarkdownSchema = z.string().min(1).max(2 * 1024 * 1024).describe('The full Markdown source of the document (GitHub-flavoured). Max 2 MB.');
+
+const FileNameSchema = z.string().max(120).optional().describe('Preferred file name (without extension). Defaults to the document title (first H1).');
+
+// ---- Helpers -----------------------------------------------------------------------------------
+
+const json = (value) => JSON.stringify(value, null, 2);
+
+const text = (t) => ({ type: 'text', text: t });
+
+function toolError(message) {
+  return { isError: true, content: [text(message)] };
+}
+
+function publicOrigin(ctx) {
+  try {
+    const req = ctx?.http?.req;
+    if (req) {
+      const proto = req.headers.get('x-forwarded-proto')?.split(',')[0].trim();
+      const host = req.headers.get('x-forwarded-host')?.split(',')[0].trim() || req.headers.get('host');
+      if (host) return `${proto || new URL(req.url).protocol.replace(':', '')}://${host}`;
+      return new URL(req.url).origin;
+    }
+  } catch {
+    /* fall through */
+  }
+  return SITE_URL;
+}
+
+function designOptions() {
+  const map = (obj, pick) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, pick(v)]));
+  return {
+    defaults: DEFAULT_SETTINGS,
+    themes: map(THEMES, (t) => ({ name: t.name, description: t.description, accent: t.accent, dark: t.dark, defaultFont: t.defaultFont, defaultHeadingFont: t.defaultHeadingFont === 'same' ? t.defaultFont : t.defaultHeadingFont })),
+    fonts: map(FONTS, (f) => ({ name: f.name, kind: f.kind })),
+    fontSizes: map(FONT_SIZES, (f) => ({ name: f.name, bodyPt: f.body })),
+    paperSizes: map(PAPER_SIZES, (p) => ({ name: p.name, widthPx: p.width, heightPx: p.height })),
+    margins: map(MARGINS, (m) => ({ name: m.name, horizontalPx: m.x, verticalPx: m.y })),
+    backgrounds: map(BACKGROUNDS, (b) => b.name),
+    pageBreaks: map(PAGE_BREAK_MODES, (p) => p.name),
+    logoPositions: map(LOGO_POSITIONS, (l) => l.name),
+    logoSizes: map(LOGO_SIZES, (l) => ({ name: l.name, heightPx: l.px })),
+    placeholders: { '{title}': 'Replaced with the document title in header.text / footer.text' },
+    pageBreakDirective: '\\pagebreak on its own line (or <!-- pagebreak -->)',
+    imageSizeHint: '![alt](url =WIDTHxHEIGHT) — either dimension may be omitted, e.g. =300x',
+  };
+}
+
+function templateSummary(t) {
+  return { id: t.id, name: t.name, description: t.description, settings: t.settings || {} };
+}
+
+/**
+ * Register every tool, resource and prompt on an McpServer instance.
+ * @param {import('@modelcontextprotocol/server').McpServer} server
+ */
+export function registerMarkdownStudio(server) {
+  // ---- Tools ---------------------------------------------------------------------------------
+
+  server.registerTool(
+    'get_markdown_guide',
+    {
+      title: 'Markdown authoring guide',
+      description:
+        'Returns the authoring guide for Markdown Studio: which Markdown syntax renders (and how), document-structure rules, design settings, per-document-type recipes and anti-patterns. Call this once before writing a document.',
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async () => ({ content: [text(MARKDOWN_GUIDE)] }),
+  );
+
+  server.registerTool(
+    'list_design_options',
+    {
+      title: 'List design options',
+      description: 'Every valid value for the `settings` object (themes with their colours and default fonts, fonts, font sizes, paper sizes, margins, backgrounds, page-break modes, logo placement) plus the defaults.',
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async () => {
+      const options = designOptions();
+      return { content: [text(json(options))], structuredContent: options };
+    },
+  );
+
+  server.registerTool(
+    'list_templates',
+    {
+      title: 'List templates',
+      description: 'Starter documents (business report, proposal, README, meeting notes, invoice, résumé, feature tour). Each has a proven heading structure and recommended design settings. Use get_template to fetch the Markdown.',
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async () => {
+      const templates = TEMPLATES.map(templateSummary);
+      return { content: [text(json(templates))], structuredContent: { templates } };
+    },
+  );
+
+  server.registerTool(
+    'get_template',
+    {
+      title: 'Get template',
+      description: 'Fetch a template by id: its Markdown source and the design settings it was designed for. Use the structure as a skeleton and pass the settings to render_pdf.',
+      inputSchema: z.object({
+        id: z.enum(TEMPLATES.map((t) => t.id)).describe(`One of: ${TEMPLATES.map((t) => t.id).join(', ')}.`),
+      }),
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ id }) => {
+      const t = getTemplate(id);
+      if (!t) return toolError(`Unknown template "${id}".`);
+      const result = { ...templateSummary(t), markdown: t.markdown };
+      return {
+        content: [text(`Template "${t.name}" — recommended settings:\n${json(result.settings)}\n\n---\n\n${t.markdown}`)],
+        structuredContent: result,
+      };
+    },
+  );
+
+  server.registerTool(
+    'analyze_markdown',
+    {
+      title: 'Analyze Markdown',
+      description:
+        'Lint a Markdown document for this renderer before rendering. Returns the inferred title, an outline, content statistics and a list of warnings with line numbers (skipped heading levels, code fences without a language, YAML front-matter, LaTeX, raw HTML, ragged tables, missing assets, undefined footnotes, hand-written TOC/numbering…). Fix all "warning"-severity items; "info" items are suggestions.',
+      inputSchema: z.object({
+        markdown: MarkdownSchema,
+        settings: SettingsSchema.optional(),
+        assets: AssetsSchema.optional().describe('Pass the same assets you will render with so asset: references can be checked.'),
+      }),
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ markdown, settings, assets }) => {
+      try {
+        assertMarkdownSize(markdown);
+        const report = analyzeMarkdown(markdown, { assets: sanitizeAssets(assets), toc: !!settings?.toc });
+        const summary = report.warnings.length
+          ? `${report.warnings.filter((w) => w.severity === 'warning').length} warning(s), ${report.warnings.filter((w) => w.severity === 'info').length} suggestion(s).`
+          : 'No issues found.';
+        return { content: [text(`${summary}\n\n${json(report)}`)], structuredContent: report };
+      } catch (err) {
+        return toolError(err.message);
+      }
+    },
+  );
+
+  const renderInput = z.object({
+    markdown: MarkdownSchema,
+    settings: SettingsSchema.optional(),
+    assets: AssetsSchema.optional(),
+    fileName: FileNameSchema,
+  });
+
+  server.registerTool(
+    'render_html',
+    {
+      title: 'Render HTML',
+      description:
+        'Render Markdown + settings to a complete standalone HTML document (same CSS, fonts and layout as the PDF, without page breaks). Fast — no headless browser. Useful to inspect the output or to hand to a browser/printer yourself. Returns the HTML as an embedded text/html resource.',
+      inputSchema: renderInput,
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ markdown, settings, assets, fileName }, ctx) => {
+      try {
+        assertMarkdownSize(markdown);
+        const cleanAssets = sanitizeAssets(assets);
+        const normalized = normalizeSettings(settings);
+        const title = fileName || inferTitle(markdown, 'document');
+        const html = buildDocumentHtml({ markdown, settings: normalized, assets: cleanAssets, mode: 'pdf', title: fileName });
+        const name = safeFileName(title, 'html');
+        return {
+          content: [
+            text(`Rendered ${name} (${(Buffer.byteLength(html, 'utf8') / 1024).toFixed(1)} KB) with theme "${normalized.theme}". The full HTML follows as an embedded resource. For a PDF call render_pdf, or POST the same body to ${publicOrigin(ctx)}/api/convert with "format": "html" or omit it for a PDF.`),
+            { type: 'resource', resource: { uri: `markdown-studio://render/${encodeURIComponent(name)}`, mimeType: 'text/html', text: html } },
+          ],
+        };
+      } catch (err) {
+        return toolError(err.message);
+      }
+    },
+  );
+
+  server.registerTool(
+    'render_pdf',
+    {
+      title: 'Render PDF',
+      description:
+        'Render Markdown + settings to a PDF with headless Chromium (takes 3–15 s). The PDF is returned as a base64 `application/pdf` embedded resource — decode it and write it to disk (e.g. `base64 -d`). If you have shell access and want to skip base64, POST {"markdown","settings","assets","fileName"} to /api/convert on the same host and save the response body. Run analyze_markdown first and fix its warnings.',
+      inputSchema: renderInput,
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ markdown, settings, assets, fileName }, ctx) => {
+      let cleanAssets;
+      try {
+        assertMarkdownSize(markdown);
+        cleanAssets = sanitizeAssets(assets);
+      } catch (err) {
+        return toolError(err.message);
+      }
+      const normalized = normalizeSettings(settings);
+      const requested = fileName ? String(fileName).slice(0, 120) : '';
+      const started = Date.now();
+      try {
+        const { pdf, title } = await renderPdf({ markdown, settings: normalized, assets: cleanAssets, title: requested });
+        const name = safeFileName(requested || title, 'pdf');
+        const seconds = ((Date.now() - started) / 1000).toFixed(1);
+        const kb = (pdf.length / 1024).toFixed(0);
+        return {
+          content: [
+            text(
+              `Rendered "${name}" — ${kb} KB in ${seconds}s (theme "${normalized.theme}", ${normalized.paperSize} ${normalized.orientation}${normalized.toc ? ', TOC' : ''}${normalized.cover.enabled ? ', cover page' : ''}). ` +
+                `The PDF is attached as a base64 application/pdf resource; decode it to save the file. ` +
+                `Direct download alternative: POST the same JSON to ${publicOrigin(ctx)}/api/convert.`,
+            ),
+            { type: 'resource', resource: { uri: `markdown-studio://render/${encodeURIComponent(name)}`, mimeType: 'application/pdf', blob: pdf.toString('base64') } },
+          ],
+          structuredContent: { fileName: name, bytes: pdf.length, renderMs: Date.now() - started, title, settings: normalized },
+        };
+      } catch (error) {
+        console.error('[mcp] render_pdf failed:', error);
+        const hint = /Could not find|executablePath|Failed to launch|spawn/i.test(error.message)
+          ? 'The PDF engine (Chromium) could not be started on the server.'
+          : /timeout/i.test(error.message)
+            ? 'Rendering timed out — very large documents or slow remote images can cause this. Remove heavy images or split the document.'
+            : `PDF rendering failed: ${error.message}`;
+        return toolError(hint);
+      }
+    },
+  );
+
+  // ---- Resources -----------------------------------------------------------------------------
+
+  server.registerResource(
+    'guide',
+    'markdown-studio://guide',
+    { title: 'Markdown Studio authoring guide', description: 'How to write Markdown that renders well in Markdown Studio.', mimeType: 'text/markdown' },
+    async (uri) => ({ contents: [{ uri: uri.href, mimeType: 'text/markdown', text: MARKDOWN_GUIDE }] }),
+  );
+
+  server.registerResource(
+    'design-options',
+    'markdown-studio://design-options',
+    { title: 'Design options', description: 'Valid values and defaults for the settings object.', mimeType: 'application/json' },
+    async (uri) => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: json(designOptions()) }] }),
+  );
+
+  server.registerResource(
+    'template',
+    new ResourceTemplate('markdown-studio://templates/{id}', {
+      list: async () => ({
+        resources: TEMPLATES.map((t) => ({ uri: `markdown-studio://templates/${t.id}`, name: t.id, title: t.name, description: t.description, mimeType: 'text/markdown' })),
+      }),
+      complete: { id: async (value) => TEMPLATES.map((t) => t.id).filter((id) => id.startsWith(value || '')) },
+    }),
+    { title: 'Document template', description: 'Starter Markdown for a document type. Recommended settings are in the first HTML comment.', mimeType: 'text/markdown' },
+    async (uri, { id }) => {
+      const t = getTemplate(String(id));
+      if (!t) throw new Error(`Unknown template "${id}"`);
+      const body = `<!-- markdown-studio settings: ${JSON.stringify(t.settings || {})} -->\n\n${t.markdown}`;
+      return { contents: [{ uri: uri.href, mimeType: 'text/markdown', text: body }] };
+    },
+  );
+
+  // ---- Prompts -------------------------------------------------------------------------------
+
+  server.registerPrompt(
+    'write_document',
+    {
+      title: 'Write a document',
+      description: 'Draft a well-structured document for Markdown Studio from a brief, choosing an appropriate template and design settings.',
+      argsSchema: z.object({
+        brief: z.string().describe('What the document is about, who it is for, and any facts to include.'),
+        kind: z.enum(['report', 'proposal', 'readme', 'meeting', 'invoice', 'resume', 'other']).optional().describe('Document type; defaults to whatever fits the brief.'),
+      }),
+    },
+    ({ brief, kind }) => ({
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: [
+              `Write a ${kind && kind !== 'other' ? `${kind} ` : ''}document in Markdown for Markdown Studio.`,
+              '',
+              'Brief:',
+              brief,
+              '',
+              'Rules:',
+              '- Follow the Markdown Studio authoring guide exactly (call get_markdown_guide if you have not read it in this session).',
+              kind && kind !== 'other' ? `- Start from the "${kind}" template (get_template) and keep its recommended settings unless the brief says otherwise.` : '- Pick the closest template from list_templates and reuse its settings.',
+              '- One `#` title, `##` sections, tables for structured data, callouts for key points, titled code blocks for code.',
+              '- Do not write a manual table of contents or number headings by hand; use settings.toc / settings.headingNumbers.',
+              '- Run analyze_markdown and fix every warning before rendering.',
+              '- Finish by calling render_pdf with the chosen settings and report the file name.',
+            ].join('\n'),
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
+    'polish_markdown',
+    {
+      title: 'Polish existing Markdown',
+      description: 'Rewrite an existing Markdown document so it renders cleanly in Markdown Studio, without changing its meaning.',
+      argsSchema: z.object({ markdown: z.string().describe('The Markdown to improve.') }),
+    },
+    ({ markdown }) => ({
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: [
+              'Improve the formatting of the Markdown below for Markdown Studio without changing its content or meaning.',
+              '',
+              'Steps:',
+              '1. Call analyze_markdown on it and read the warnings.',
+              '2. Apply the authoring guide (get_markdown_guide): a single H1, no skipped heading levels, languages on code fences, GitHub callouts instead of bold "Note:" lines, real tables instead of aligned text, footnotes for sources, no LaTeX/HTML/front-matter.',
+              '3. Re-run analyze_markdown until there are no warnings.',
+              '4. Suggest a theme and settings, then return the polished Markdown.',
+              '',
+              '```md',
+              markdown,
+              '```',
+            ].join('\n'),
+          },
+        },
+      ],
+    }),
+  );
+}
