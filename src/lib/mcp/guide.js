@@ -6,7 +6,9 @@
  * write a well-formatted document from this text alone.
  */
 
-export const GUIDE_VERSION = '1.0.0';
+import { ARGUMENT_CATALOG } from './arguments.js';
+
+export const GUIDE_VERSION = '1.1.0';
 
 export const MARKDOWN_GUIDE = `# Writing Markdown for Markdown Studio
 
@@ -20,7 +22,8 @@ front-matter, custom CSS) does **not**.
 2. Pick a starting point: \`list_templates\` → \`get_template\` gives you proven structure **and** matching design settings for reports, proposals, READMEs, meeting notes, invoices and résumés.
 3. Write the Markdown. One \`#\` title, \`##\` sections, short paragraphs, generous use of tables, callouts and code blocks.
 4. Run \`analyze_markdown\` — it returns the outline plus warnings (skipped heading levels, code fences without a language, YAML front-matter, missing images, ragged tables…). Fix everything it reports.
-5. Render with \`render_pdf\` (or \`render_html\` for a quick look). Pass \`settings\` to choose theme, paper, table of contents, cover page, header/footer.
+5. If the user asked for a nice PDF, tell them the design knobs (theme, paper, TOC, cover, header/footer, fonts) and agree a \`settings\` object — the full argument list is at the end of this guide.
+6. Render with \`render_pdf\` (or \`render_html\` for a quick look). Pass \`markdown\`, \`settings\`, optional \`assets\` and \`fileName\`.
 
 ## Document structure
 
@@ -150,7 +153,7 @@ Put \`\\pagebreak\` (or \`<!-- pagebreak -->\`) on its own line, surrounded by b
 
 ## Design settings
 
-Pass a \`settings\` object to \`render_pdf\` / \`render_html\`. Every key is optional; call \`list_design_options\` for the complete list of values.
+Pass a \`settings\` object to \`render_pdf\` / \`render_html\`. Every key is optional. The complete argument list (tools, nested \`settings\` fields, enums, defaults, prompts) is in **Relaying options to the user** below — use that list when explaining choices to a person. \`list_design_options\` returns the same enums as JSON.
 
 \`\`\`json
 {
@@ -185,18 +188,7 @@ Pass a \`settings\` object to \`render_pdf\` / \`render_html\`. Every key is opt
 | \`mono\` | Pure black & white, Space Grotesk | Invoices, specs, anything to be printed in B/W |
 | \`midnight\` | Dark slate page, light text | Screen-only PDFs, slides-like handouts |
 
-### Other knobs
-
-- \`toc\` — table of contents after the title (H2/H3). Use for anything over ~3 pages.
-- \`headingNumbers\` — 1 / 1.1 / 1.1.1 numbering on H1–H3.
-- \`cover.enabled\` — full cover page; \`cover.title\` defaults to the H1, add \`subtitle\`, \`author\`, \`date\`.
-- \`header.text\` / \`footer.text\` — \`{title}\` is replaced with the document title. Keep them short and free of emoji.
-- \`footer.pageNumberStyle\` — \`"n-of-total"\` → "3 / 12", \`"n"\` → "3".
-- \`pageBreaks\` — \`"auto"\` (smart: headings never orphaned, code/figures kept together), \`"h1"\`, \`"h2"\`.
-- \`fontSize\` — \`sm\` 9.5 pt (dense: résumés, invoices), \`md\` 10.5 pt (default), \`lg\` 12 pt (accessible / handouts).
-- \`margins\` — \`narrow\` / \`normal\` / \`wide\`. \`orientation: "landscape"\` for wide tables.
-- \`background\` — \`none\`, \`soft\`, \`gradient\`, \`dots\`, \`grid\`, \`lines\` (subtle full-page textures).
-- \`logo\` — data URL image; \`position\` is \`title-right\`, \`title-above\`, \`page-header\` or \`watermark\`.
+Every nested field, enum, default and tool argument is listed at the end of this guide.
 
 ## Recipes
 
@@ -219,4 +211,6 @@ Pass a \`settings\` object to \`render_pdf\` / \`render_html\`. Every key is opt
 - Hard-wrapped paragraphs and trailing double-spaces used as "formatting" — they create random line breaks.
 - Emoji in \`header.text\` / \`footer.text\` — running heads use a print font without emoji glyphs.
 - Relative image paths (\`./img/chart.png\`) — the renderer cannot see your file system; use HTTPS URLs or \`assets\`.
+
+${ARGUMENT_CATALOG}
 `;

@@ -47,17 +47,12 @@ export function buildDocumentHtml({ markdown, settings: rawSettings, assets = {}
     const h1Count = headings.filter((h) => h.depth === 1).length;
     const items = headings.filter((h) => !(h1Count === 1 && h.depth === 1));
     if (items.length) {
-      const toc = `<nav class="toc"><p class="toc-title">Contents</p><ol>${items
+      // After a cover page the TOC gets its own page; otherwise it follows the title.
+      const standalone = settings.cover.enabled;
+      const toc = `<nav class="toc${standalone ? ' toc-page' : ''}"><p class="toc-title">Contents</p><ol>${items
         .map((h) => `<li class="d${h.depth}"><a href="#${escapeHtml(h.id)}">${escapeHtml(h.text)}</a></li>`)
-        .join('')}</ol></nav>`;
-      // Insert after the title block / first h1 if present, else at the top.
-      const anchor = body.match(/<\/div>\n?|<\/h1>\n?/);
-      if (anchor && anchor.index !== undefined && (body.slice(0, anchor.index).match(/<h1\b/) || body.startsWith('<div class="title-block">'))) {
-        const cut = anchor.index + anchor[0].length;
-        body = body.slice(0, cut) + toc + body.slice(cut);
-      } else {
-        body = toc + body;
-      }
+        .join('')}</ol></nav>${standalone && isPreview ? '<div class="page-break"></div>' : ''}`;
+      body = standalone ? toc + body : insertAfterTitle(body, toc);
     }
   }
 
@@ -139,7 +134,7 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
   }
   function keepTogether(el, h) {
     if (h > perPage * 0.9) return false;
-    if (/^H[1-6]$/.test(el.tagName) || el.classList.contains('title-block') || el.classList.contains('toc')) return true;
+    if (/^H[1-6]$/.test(el.tagName) || el.classList.contains('title-block')) return true;
     if (el.matches('figure, blockquote, .markdown-alert, hr, .logo-above')) return true;
     if (el.classList.contains('code-block')) return (parseInt(el.getAttribute('data-lines'), 10) || 99) <= 28;
     if (el.tagName === 'P') { var lh = parseFloat(getComputedStyle(el).lineHeight) || 20; return h <= lh * 5.5; }
@@ -252,6 +247,21 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
 </script>
 </body>
 </html>`;
+}
+
+/** Place HTML after the title row (logo + h1), never inside the title flex box. */
+function insertAfterTitle(body, html) {
+  const titleBlock = body.match(/<div class="title-block">[\s\S]*?<\/div>\n?/);
+  if (titleBlock && titleBlock.index !== undefined && !body.slice(0, titleBlock.index).includes('<h1')) {
+    const cut = titleBlock.index + titleBlock[0].length;
+    return body.slice(0, cut) + html + body.slice(cut);
+  }
+  const h1 = body.match(/<h1\b[\s\S]*?<\/h1>\n?/);
+  if (h1 && h1.index !== undefined) {
+    const cut = h1.index + h1[0].length;
+    return body.slice(0, cut) + html + body.slice(cut);
+  }
+  return html + body;
 }
 
 function fontLink(design) {

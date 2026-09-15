@@ -138,14 +138,25 @@ export function buildStyles(design, settings, mode) {
     .logo-above { display: block; width: auto; max-width: 100%; margin: 0 0 1.4em; }
 
     /* ---------- Table of contents ---------- */
-    .toc { margin: 0 0 2.2em; padding: 1.1em 1.4em; border: 1px solid ${t.border}; border-radius: 8px; background: ${t.quoteBackground}; break-inside: avoid; }
-    .toc-title { font-family: ${design.headingFont.family}; font-weight: 600; font-size: .85em; letter-spacing: .12em; text-transform: uppercase; color: ${t.muted}; margin: 0 0 .7em; }
+    .toc { margin: .4em 0 2.2em; padding: 0; border: 0; background: transparent; }
+    .toc-title {
+      font-family: ${design.headingFont.family}; font-weight: 700; font-size: 1.5em; line-height: 1.25;
+      letter-spacing: -.01em; text-transform: none; color: ${t.heading};
+      margin: 0 0 .85em; padding: 0 0 .3em; border-bottom: 1px solid ${t.border};
+    }
     .toc ol { list-style: none; margin: 0; padding: 0; }
-    .toc li { margin: .28em 0; line-height: 1.4; }
-    .toc li.d2 { padding-left: 1.4em; }
-    .toc li.d3 { padding-left: 2.8em; font-size: .93em; color: ${t.muted}; }
-    .toc a { color: ${t.text}; text-decoration: none; }
-    .toc li.d1 a { font-weight: 600; }
+    .toc li { margin: 0; padding: .38em 0; line-height: 1.4; break-inside: avoid; border-bottom: 1px solid rgba(${hexToRgb(t.border)}, .7); }
+    .toc li.d1 { margin-top: .35em; }
+    .toc li.d1:first-child { margin-top: 0; }
+    .toc li.d2 { padding-left: 1.35em; }
+    .toc li.d3 { padding-left: 2.7em; font-size: .93em; }
+    .toc a { color: ${t.text}; text-decoration: none; border-bottom: 0; display: block; }
+    .toc li.d1 a { font-weight: 600; color: ${t.heading}; }
+    .toc li.d3 a { color: ${t.muted}; font-weight: 400; }
+    .title-block + .toc, h1 + .toc { margin-top: 1.6em; }
+    .doc > .toc:first-child { margin-top: 0; }
+    .toc.toc-page { margin-bottom: 0; }
+    ${!isPreview ? `.toc.toc-page { break-after: page; page-break-after: always; }` : ''}
 
     /* ---------- Headings ---------- */
     h1, h2, h3, h4, h5, h6 {
@@ -171,7 +182,7 @@ export function buildStyles(design, settings, mode) {
     ${settings.pageBreaks === 'h2' && !isPreview ? `.doc h2 { break-before: page; page-break-before: always; }` : ''}
     ${settings.pageBreaks !== 'auto' && isPreview ? `.doc h1:not(:first-child):not(.cover-title) { border-top: 1px dashed ${t.border}; padding-top: 1.5em; }` : ''}
     ${settings.pageBreaks === 'h2' && isPreview ? `.doc h2 { border-top: 1px dashed ${t.border}; padding-top: 1.2em; }` : ''}
-    .title-block + h2, h1 + h2 { margin-top: 1em; }
+    .title-block + h2, h1 + h2, .toc + h2 { margin-top: 1em; }
 
     /* ---------- Text ---------- */
     p { margin: 0 0 .9em; orphans: 3; widows: 3; }

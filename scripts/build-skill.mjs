@@ -27,12 +27,14 @@ Markdown Studio exposes a remote MCP server at \`${MCP_URL}\` (Streamable HTTP, 
 
 | Tool | Use it to |
 | --- | --- |
-| \`get_markdown_guide\` | Read the full authoring guide (same content as below) |
+| \`get_markdown_guide\` | Read the full authoring guide **and** every tool/settings argument (same content as below) |
 | \`list_templates\` / \`get_template\` | Start from a proven structure with matching design settings |
-| \`list_design_options\` | See every valid \`settings\` value (themes, fonts, paper, …) |
+| \`list_design_options\` | JSON of every valid \`settings\` value (themes, fonts, paper, …) — relay these when the user wants a nice PDF |
 | \`analyze_markdown\` | Lint before rendering; fix every warning it reports |
-| \`render_html\` | Quick standalone HTML preview |
-| \`render_pdf\` | Final PDF (returned as a base64 \`application/pdf\` resource) |
+| \`render_html\` | Quick standalone HTML preview (\`markdown\`, \`settings\`, \`assets\`, \`fileName\`) |
+| \`render_pdf\` | Final PDF as a base64 \`application/pdf\` resource (same arguments as \`render_html\`) |
+
+Prompts: \`write_document\`, \`polish_markdown\`, \`make_pdf\` (walk through every design argument, then render).
 
 Without the MCP server you can still POST \`{"markdown","settings","fileName"}\` to \`https://md-to-pdf.vercel.app/api/convert\` and save the PDF response body.
 

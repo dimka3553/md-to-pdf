@@ -19,23 +19,28 @@ import { assertMarkdownSize, sanitizeAssets, safeFileName } from '../document/li
 import { TEMPLATES, getTemplate } from '../templates.js';
 import { renderPdf } from '../pdf/generate.js';
 import { analyzeMarkdown } from './analyze.js';
+import { ARGUMENT_CATALOG, FIELD_HELP, TEMPLATE_IDS } from './arguments.js';
 import { GUIDE_VERSION, MARKDOWN_GUIDE } from './guide.js';
 
 export const SERVER_INFO = { name: 'markdown-studio', version: GUIDE_VERSION };
 
 export const SERVER_INSTRUCTIONS = `Markdown Studio turns Markdown into polished, print-ready PDFs (themes, cover page, table of contents, running header/footer, callouts, Mermaid diagrams, syntax-highlighted code).
 
+When a user asks you to make a nice PDF, explain the design arguments they can choose (theme, paper, fonts, TOC, cover, header/footer, logo, file name) using the catalog below, recommend a starting set for their document type, then pass their choices as settings to render_pdf. Call list_design_options if you need the live enum JSON.
+
 Recommended flow:
-1. Call get_markdown_guide once per session and follow it — it lists exactly which syntax renders and which does not (no LaTeX, no HTML layouts, no YAML front-matter).
+1. Call get_markdown_guide once per session and follow it — it lists which syntax renders (no LaTeX, no HTML layouts, no YAML front-matter) and every tool/settings argument.
 2. Optionally call list_templates / get_template for a proven structure and matching design settings.
-3. Write the Markdown, then call analyze_markdown and fix every warning.
-4. Call render_pdf (returns the PDF as a base64 resource) or render_html.
-All tools are stateless; pass the full markdown each time.`;
+3. Agree settings with the user (or apply the matching recipe if they want you to decide).
+4. Write the Markdown, then call analyze_markdown and fix every warning.
+5. Call render_pdf (PDF as a base64 resource) or render_html.
+All tools are stateless; pass the full markdown each time.
+
+${ARGUMENT_CATALOG}`;
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://md-to-pdf.vercel.app';
 
 const keys = (o) => Object.keys(o);
-const listOf = (o) => keys(o).join(', ');
 
 // ---- Schemas -----------------------------------------------------------------------------------
 
@@ -43,64 +48,67 @@ const HexColor = z.string().regex(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i, 'Use #rgb or 
 
 export const SettingsSchema = z
   .object({
-    theme: z.enum(keys(THEMES)).describe(`Colour/typography theme: ${listOf(THEMES)}. Default "clean".`),
-    font: z.enum(['inherit', ...keys(FONTS)]).describe(`Body font. "inherit" uses the theme default. Options: ${listOf(FONTS)}.`),
-    headingFont: z.enum(['inherit', ...keys(FONTS)]).describe('Heading font; "inherit" uses the theme default.'),
-    fontSize: z.enum(keys(FONT_SIZES)).describe('sm = 9.5pt (dense), md = 10.5pt (default), lg = 12pt.'),
-    accentColor: HexColor.describe('Override the theme accent colour, e.g. "#0F4C81".'),
-    paperSize: z.enum(keys(PAPER_SIZES)).describe('A4 (default), Letter or Legal.'),
-    orientation: z.enum(['portrait', 'landscape']),
-    margins: z.enum(keys(MARGINS)).describe('narrow, normal (default) or wide.'),
-    background: z.enum(keys(BACKGROUNDS)).describe(`Subtle full-page background: ${listOf(BACKGROUNDS)}.`),
-    pageBreaks: z.enum(keys(PAGE_BREAK_MODES)).describe('auto (smart, default), h1 = new page before every H1, h2 = before every H1 and H2.'),
-    toc: z.boolean().describe('Insert a generated table of contents (H2/H3) after the title.'),
-    headingNumbers: z.boolean().describe('Number H1–H3 headings automatically (1, 1.1, 1.1.1).'),
-    justify: z.boolean().describe('Justify body text.'),
+    theme: z.enum(keys(THEMES)).describe(FIELD_HELP.theme),
+    font: z.enum(['inherit', ...keys(FONTS)]).describe(FIELD_HELP.font),
+    headingFont: z.enum(['inherit', ...keys(FONTS)]).describe(FIELD_HELP.headingFont),
+    fontSize: z.enum(keys(FONT_SIZES)).describe(FIELD_HELP.fontSize),
+    accentColor: HexColor.describe(FIELD_HELP.accentColor),
+    paperSize: z.enum(keys(PAPER_SIZES)).describe(FIELD_HELP.paperSize),
+    orientation: z.enum(['portrait', 'landscape']).describe(FIELD_HELP.orientation),
+    margins: z.enum(keys(MARGINS)).describe(FIELD_HELP.margins),
+    background: z.enum(keys(BACKGROUNDS)).describe(FIELD_HELP.background),
+    pageBreaks: z.enum(keys(PAGE_BREAK_MODES)).describe(FIELD_HELP.pageBreaks),
+    toc: z.boolean().describe(FIELD_HELP.toc),
+    headingNumbers: z.boolean().describe(FIELD_HELP.headingNumbers),
+    justify: z.boolean().describe(FIELD_HELP.justify),
     header: z
       .object({
-        text: z.string().max(200).describe('Running header text; "{title}" is replaced with the document title.'),
-        showDate: z.boolean().describe('Show today\'s date on the right of the header.'),
+        text: z.string().max(200).describe(FIELD_HELP.headerText),
+        showDate: z.boolean().describe(FIELD_HELP.headerShowDate),
       })
-      .partial(),
+      .partial()
+      .describe('Running header. Partial object is fine; omitted fields keep defaults.'),
     footer: z
       .object({
-        text: z.string().max(200).describe('Running footer text; supports "{title}".'),
-        pageNumbers: z.boolean().describe('Show page numbers (default true).'),
-        pageNumberStyle: z.enum(['n-of-total', 'n']).describe('"n-of-total" → "3 / 12", "n" → "3".'),
+        text: z.string().max(200).describe(FIELD_HELP.footerText),
+        pageNumbers: z.boolean().describe(FIELD_HELP.footerPageNumbers),
+        pageNumberStyle: z.enum(['n-of-total', 'n']).describe(FIELD_HELP.footerPageNumberStyle),
       })
-      .partial(),
+      .partial()
+      .describe('Running footer. Partial object is fine; omitted fields keep defaults.'),
     cover: z
       .object({
-        enabled: z.boolean(),
-        title: z.string().max(300).describe('Defaults to the document H1.'),
-        subtitle: z.string().max(500),
-        author: z.string().max(200),
-        date: z.string().max(100),
-        showLogo: z.boolean(),
+        enabled: z.boolean().describe(FIELD_HELP.coverEnabled),
+        title: z.string().max(300).describe(FIELD_HELP.coverTitle),
+        subtitle: z.string().max(500).describe(FIELD_HELP.coverSubtitle),
+        author: z.string().max(200).describe(FIELD_HELP.coverAuthor),
+        date: z.string().max(100).describe(FIELD_HELP.coverDate),
+        showLogo: z.boolean().describe(FIELD_HELP.coverShowLogo),
       })
-      .partial(),
+      .partial()
+      .describe('Cover page. Set enabled true to insert it; other fields are optional.'),
     logo: z
       .object({
-        dataUrl: z.string().startsWith('data:image/').describe('PNG/JPEG/SVG as a data URL.'),
-        name: z.string().max(200).optional(),
-        position: z.enum(keys(LOGO_POSITIONS)).describe(`${listOf(LOGO_POSITIONS)}.`),
-        size: z.enum(keys(LOGO_SIZES)).describe('sm (32px), md (48px), lg (72px).'),
-        aspect: z.number().positive().optional().describe('width / height of the logo image, used for header sizing.'),
+        dataUrl: z.string().startsWith('data:image/').describe(FIELD_HELP.logoDataUrl),
+        name: z.string().max(200).optional().describe(FIELD_HELP.logoName),
+        position: z.enum(keys(LOGO_POSITIONS)).describe(FIELD_HELP.logoPosition),
+        size: z.enum(keys(LOGO_SIZES)).describe(FIELD_HELP.logoSize),
+        aspect: z.number().positive().optional().describe(FIELD_HELP.logoAspect),
       })
       .partial({ name: true, position: true, size: true, aspect: true })
       .nullable()
-      .describe('Logo image and placement, or null.'),
+      .describe('Logo image and placement, or null to omit. dataUrl is required when the object is present.'),
   })
   .partial()
-  .describe('Document design settings. Every key is optional; see list_design_options for details.');
+  .describe(FIELD_HELP.settings);
 
 const AssetsSchema = z
   .record(z.string().max(200), z.string().startsWith('data:image/'))
-  .describe('Embedded images keyed by name, each a data URL (data:image/png;base64,…). Reference them in Markdown as ![alt](asset:name). Max 24 images, 3 MB each, 8 MB total.');
+  .describe(FIELD_HELP.assets);
 
-const MarkdownSchema = z.string().min(1).max(2 * 1024 * 1024).describe('The full Markdown source of the document (GitHub-flavoured). Max 2 MB.');
+const MarkdownSchema = z.string().min(1).max(2 * 1024 * 1024).describe(FIELD_HELP.markdown);
 
-const FileNameSchema = z.string().max(120).optional().describe('Preferred file name (without extension). Defaults to the document title (first H1).');
+const FileNameSchema = z.string().max(120).optional().describe(FIELD_HELP.fileName);
 
 // ---- Helpers -----------------------------------------------------------------------------------
 
@@ -162,7 +170,7 @@ export function registerMarkdownStudio(server) {
     {
       title: 'Markdown authoring guide',
       description:
-        'Returns the authoring guide for Markdown Studio: which Markdown syntax renders (and how), document-structure rules, design settings, per-document-type recipes and anti-patterns. Call this once before writing a document.',
+        'Returns the authoring guide: supported Markdown syntax, structure rules, recipes, anti-patterns, and the complete catalog of every MCP tool/prompt argument and settings field (with allowed values and defaults). Call once per session. Use that catalog when a user asks what they can choose for a nice PDF.',
       inputSchema: z.object({}),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
@@ -173,7 +181,8 @@ export function registerMarkdownStudio(server) {
     'list_design_options',
     {
       title: 'List design options',
-      description: 'Every valid value for the `settings` object (themes with their colours and default fonts, fonts, font sizes, paper sizes, margins, backgrounds, page-break modes, logo placement) plus the defaults.',
+      description:
+        'JSON catalog of every valid `settings` value: defaults, themes (colours, dark/light, default fonts), fonts, font sizes, paper sizes, margins, backgrounds, page-break modes, logo positions/sizes, `{title}` placeholder, page-break directive and image size hint. Present these options to the user when they ask to make a nice PDF.',
       inputSchema: z.object({}),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
@@ -203,7 +212,7 @@ export function registerMarkdownStudio(server) {
       title: 'Get template',
       description: 'Fetch a template by id: its Markdown source and the design settings it was designed for. Use the structure as a skeleton and pass the settings to render_pdf.',
       inputSchema: z.object({
-        id: z.enum(TEMPLATES.map((t) => t.id)).describe(`One of: ${TEMPLATES.map((t) => t.id).join(', ')}.`),
+        id: z.enum(TEMPLATE_IDS).describe(FIELD_HELP.templateId),
       }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
@@ -257,7 +266,7 @@ export function registerMarkdownStudio(server) {
     {
       title: 'Render HTML',
       description:
-        'Render Markdown + settings to a complete standalone HTML document (same CSS, fonts and layout as the PDF, without page breaks). Fast — no headless browser. Useful to inspect the output or to hand to a browser/printer yourself. Returns the HTML as an embedded text/html resource.',
+        'Render Markdown + settings to a complete standalone HTML document (same CSS, fonts and layout as the PDF, without page breaks). Same arguments as render_pdf: markdown, settings, assets, fileName. Fast — no headless browser. Useful to inspect the output or to hand to a browser/printer yourself. Returns the HTML as an embedded text/html resource.',
       inputSchema: renderInput,
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
@@ -286,7 +295,7 @@ export function registerMarkdownStudio(server) {
     {
       title: 'Render PDF',
       description:
-        'Render Markdown + settings to a PDF with headless Chromium (takes 3–15 s). The PDF is returned as a base64 `application/pdf` embedded resource — decode it and write it to disk (e.g. `base64 -d`). If you have shell access and want to skip base64, POST {"markdown","settings","assets","fileName"} to /api/convert on the same host and save the response body. Run analyze_markdown first and fix its warnings.',
+        'Render Markdown + settings to a PDF with headless Chromium (takes 3–15 s). Arguments: markdown (required), settings (optional design object — every field is documented on the schema and in get_markdown_guide), assets (optional image data URLs), fileName (optional, no extension). The PDF is returned as a base64 `application/pdf` embedded resource — decode it and write it to disk (e.g. `base64 -d`). If you have shell access and want to skip base64, POST {"markdown","settings","assets","fileName"} to /api/convert on the same host and save the response body. Run analyze_markdown first and fix its warnings. When the user asked for a nice PDF, confirm or report the settings you used.',
       inputSchema: renderInput,
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
     },
@@ -341,7 +350,7 @@ export function registerMarkdownStudio(server) {
   server.registerResource(
     'design-options',
     'markdown-studio://design-options',
-    { title: 'Design options', description: 'Valid values and defaults for the settings object.', mimeType: 'application/json' },
+    { title: 'Design options', description: 'Every valid settings field, enum, default, logo placement, placeholders and limits — same data as list_design_options.', mimeType: 'application/json' },
     async (uri) => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: json(designOptions()) }] }),
   );
 
@@ -391,6 +400,7 @@ export function registerMarkdownStudio(server) {
               kind && kind !== 'other' ? `- Start from the "${kind}" template (get_template) and keep its recommended settings unless the brief says otherwise.` : '- Pick the closest template from list_templates and reuse its settings.',
               '- One `#` title, `##` sections, tables for structured data, callouts for key points, titled code blocks for code.',
               '- Do not write a manual table of contents or number headings by hand; use settings.toc / settings.headingNumbers.',
+              '- Tell the user the design settings you will use (theme, paper, TOC, cover, header/footer) so they can change them; every argument is in get_markdown_guide / server instructions.',
               '- Run analyze_markdown and fix every warning before rendering.',
               '- Finish by calling render_pdf with the chosen settings and report the file name.',
             ].join('\n'),
@@ -420,12 +430,53 @@ export function registerMarkdownStudio(server) {
               '1. Call analyze_markdown on it and read the warnings.',
               '2. Apply the authoring guide (get_markdown_guide): a single H1, no skipped heading levels, languages on code fences, GitHub callouts instead of bold "Note:" lines, real tables instead of aligned text, footnotes for sources, no LaTeX/HTML/front-matter.',
               '3. Re-run analyze_markdown until there are no warnings.',
-              '4. Suggest a theme and settings, then return the polished Markdown.',
+              '4. Suggest a full settings object (theme, paper, fonts, TOC, cover, header/footer) using the argument catalog, then return the polished Markdown.',
               '',
               '```md',
               markdown,
               '```',
             ].join('\n'),
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
+    'make_pdf',
+    {
+      title: 'Make a nice PDF',
+      description:
+        'Walk the user through every Markdown Studio render argument, agree a settings object, then write or take Markdown and render a PDF.',
+      argsSchema: z.object({
+        brief: z.string().optional().describe('What the PDF should contain if markdown is not provided.'),
+        markdown: z.string().optional().describe('Existing Markdown to render. If omitted, draft from the brief.'),
+        audience: z.string().optional().describe('Who will read the PDF — used to recommend theme, density and paper.'),
+      }),
+    },
+    ({ brief, markdown, audience }) => ({
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: [
+              'Make a polished PDF with Markdown Studio.',
+              audience ? `Audience: ${audience}` : '',
+              brief ? `Brief:\n${brief}` : '',
+              markdown ? `Existing Markdown:\n\`\`\`md\n${markdown}\n\`\`\`` : '',
+              '',
+              'You must relay the available arguments to the user (from get_markdown_guide / list_design_options / server instructions), not just pick silently:',
+              '- Look: theme, accentColor, font, headingFont, fontSize, background',
+              '- Page: paperSize, orientation, margins',
+              '- Structure: toc, headingNumbers, cover (enabled, title, subtitle, author, date, showLogo), pageBreaks',
+              '- Chrome: header.text, header.showDate, footer.text, footer.pageNumbers, footer.pageNumberStyle, logo',
+              '- Output: fileName; optional assets for local images',
+              'Recommend a recipe for this document type, apply what they confirm (or your recommendation if they want you to decide).',
+              'Follow the authoring guide. Run analyze_markdown and fix warnings. Call render_pdf with markdown + settings + assets + fileName. Tell them the file name and which settings you used.',
+            ]
+              .filter(Boolean)
+              .join('\n'),
           },
         },
       ],

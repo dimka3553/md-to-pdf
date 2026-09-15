@@ -3,7 +3,7 @@ name: markdown-studio
 description: Write well-formatted Markdown documents and export them as polished PDFs with Markdown Studio. Use when asked to write, format, polish or export a report, proposal, README, meeting notes, invoice, résumé or any document destined for PDF/print, or when Markdown must render correctly in Markdown Studio (md-to-pdf).
 ---
 
-<!-- Generated from src/lib/mcp/guide.js (v1.0.0) by scripts/build-skill.mjs — do not edit by hand. -->
+<!-- Generated from src/lib/mcp/guide.js (v1.1.0) by scripts/build-skill.mjs — do not edit by hand. -->
 
 ## Tooling
 
@@ -11,12 +11,14 @@ Markdown Studio exposes a remote MCP server at `https://md-to-pdf.vercel.app/api
 
 | Tool | Use it to |
 | --- | --- |
-| `get_markdown_guide` | Read the full authoring guide (same content as below) |
+| `get_markdown_guide` | Read the full authoring guide **and** every tool/settings argument (same content as below) |
 | `list_templates` / `get_template` | Start from a proven structure with matching design settings |
-| `list_design_options` | See every valid `settings` value (themes, fonts, paper, …) |
+| `list_design_options` | JSON of every valid `settings` value (themes, fonts, paper, …) — relay these when the user wants a nice PDF |
 | `analyze_markdown` | Lint before rendering; fix every warning it reports |
-| `render_html` | Quick standalone HTML preview |
-| `render_pdf` | Final PDF (returned as a base64 `application/pdf` resource) |
+| `render_html` | Quick standalone HTML preview (`markdown`, `settings`, `assets`, `fileName`) |
+| `render_pdf` | Final PDF as a base64 `application/pdf` resource (same arguments as `render_html`) |
+
+Prompts: `write_document`, `polish_markdown`, `make_pdf` (walk through every design argument, then render).
 
 Without the MCP server you can still POST `{"markdown","settings","fileName"}` to `https://md-to-pdf.vercel.app/api/convert` and save the PDF response body.
 
@@ -42,7 +44,8 @@ front-matter, custom CSS) does **not**.
 2. Pick a starting point: `list_templates` → `get_template` gives you proven structure **and** matching design settings for reports, proposals, READMEs, meeting notes, invoices and résumés.
 3. Write the Markdown. One `#` title, `##` sections, short paragraphs, generous use of tables, callouts and code blocks.
 4. Run `analyze_markdown` — it returns the outline plus warnings (skipped heading levels, code fences without a language, YAML front-matter, missing images, ragged tables…). Fix everything it reports.
-5. Render with `render_pdf` (or `render_html` for a quick look). Pass `settings` to choose theme, paper, table of contents, cover page, header/footer.
+5. If the user asked for a nice PDF, tell them the design knobs (theme, paper, TOC, cover, header/footer, fonts) and agree a `settings` object — the full argument list is at the end of this guide.
+6. Render with `render_pdf` (or `render_html` for a quick look). Pass `markdown`, `settings`, optional `assets` and `fileName`.
 
 ## Document structure
 
@@ -172,7 +175,7 @@ Put `\pagebreak` (or `<!-- pagebreak -->`) on its own line, surrounded by blank 
 
 ## Design settings
 
-Pass a `settings` object to `render_pdf` / `render_html`. Every key is optional; call `list_design_options` for the complete list of values.
+Pass a `settings` object to `render_pdf` / `render_html`. Every key is optional. The complete argument list (tools, nested `settings` fields, enums, defaults, prompts) is in **Relaying options to the user** below — use that list when explaining choices to a person. `list_design_options` returns the same enums as JSON.
 
 ```json
 {
@@ -207,18 +210,7 @@ Pass a `settings` object to `render_pdf` / `render_html`. Every key is optional;
 | `mono` | Pure black & white, Space Grotesk | Invoices, specs, anything to be printed in B/W |
 | `midnight` | Dark slate page, light text | Screen-only PDFs, slides-like handouts |
 
-### Other knobs
-
-- `toc` — table of contents after the title (H2/H3). Use for anything over ~3 pages.
-- `headingNumbers` — 1 / 1.1 / 1.1.1 numbering on H1–H3.
-- `cover.enabled` — full cover page; `cover.title` defaults to the H1, add `subtitle`, `author`, `date`.
-- `header.text` / `footer.text` — `{title}` is replaced with the document title. Keep them short and free of emoji.
-- `footer.pageNumberStyle` — `"n-of-total"` → "3 / 12", `"n"` → "3".
-- `pageBreaks` — `"auto"` (smart: headings never orphaned, code/figures kept together), `"h1"`, `"h2"`.
-- `fontSize` — `sm` 9.5 pt (dense: résumés, invoices), `md` 10.5 pt (default), `lg` 12 pt (accessible / handouts).
-- `margins` — `narrow` / `normal` / `wide`. `orientation: "landscape"` for wide tables.
-- `background` — `none`, `soft`, `gradient`, `dots`, `grid`, `lines` (subtle full-page textures).
-- `logo` — data URL image; `position` is `title-right`, `title-above`, `page-header` or `watermark`.
+Every nested field, enum, default and tool argument is listed at the end of this guide.
 
 ## Recipes
 
@@ -241,3 +233,223 @@ Pass a `settings` object to `render_pdf` / `render_html`. Every key is optional;
 - Hard-wrapped paragraphs and trailing double-spaces used as "formatting" — they create random line breaks.
 - Emoji in `header.text` / `footer.text` — running heads use a print font without emoji glyphs.
 - Relative image paths (`./img/chart.png`) — the renderer cannot see your file system; use HTTPS URLs or `assets`.
+
+## Relaying options to the user
+
+When someone asks you to make a nice PDF, tell them the knobs they can turn — do not hide them. In plain language, offer:
+
+- **Look** — theme (clean, corporate, editorial, forest, mono, midnight), optional accent colour, body/heading fonts, size (compact / comfortable / large), page background
+- **Page** — paper (A4, Letter, Legal), portrait or landscape, margins (narrow / normal / wide)
+- **Structure** — table of contents, numbered headings, cover page (title, subtitle, author, date), automatic page breaks
+- **Chrome** — running header/footer text, date in the header, page numbers ("3 / 12" or "3"), logo placement
+- **File name** — optional; otherwise taken from the H1
+
+Recommend a starting set from the recipes (report → corporate + TOC + cover, README → clean + TOC, invoice → mono, and so on). If they say "just make it look good", apply the matching recipe and mention what you chose.
+
+## Tool arguments
+
+All tools are stateless. Pass the full Markdown every time.
+
+### `get_markdown_guide`
+
+No arguments. Returns this guide (syntax + every setting).
+
+### `list_design_options`
+
+No arguments. Returns JSON: defaults, themes (colours and default fonts), fonts, sizes, paper, margins, backgrounds, page-break modes, logo placement, and the `{title}` placeholder.
+
+### `list_templates`
+
+No arguments. Returns id, name, description and recommended `settings` for each starter.
+
+### `get_template`
+
+| Argument | Required | Meaning |
+| --- | --- | --- |
+| `id` | yes | Template id: "blank", "welcome", "report", "proposal", "readme", "meeting", "invoice", "resume". |
+
+| Id | Name | Description |
+| --- | --- | --- |
+| `blank` | Blank | Start from an empty page. |
+| `welcome` | Feature tour | Every supported Markdown feature in one document. |
+| `report` | Business report | Cover page, contents, numbered sections. |
+| `proposal` | Project proposal | Scope, timeline, budget and acceptance. |
+| `readme` | Project README | Installation, usage, API and contributing. |
+| `meeting` | Meeting notes | Agenda, decisions and action items. |
+| `invoice` | Invoice | Line items, totals and payment details. |
+| `resume` | Résumé | A clean single-column CV. |
+
+Returns the Markdown skeleton and the `settings` it was designed with. Pass those settings through to `render_pdf` unless the user overrides them.
+
+### `analyze_markdown`
+
+| Argument | Required | Meaning |
+| --- | --- | --- |
+| `markdown` | yes | The full GitHub-flavoured Markdown source (max 2 MB). Always pass the entire document — tools are stateless. |
+| `settings` | no | Same object as render. Currently only `settings.toc` changes linting (hand-written TOC vs generated). |
+| `assets` | no | Embedded images as a map of name → data URL (`data:image/png;base64,…`, JPEG, SVG, WebP, GIF). Reference in Markdown as `![alt](asset:name)`. Max 24 images, 3 MB each, 8 MB total. Remote HTTPS images can be used in Markdown without this map. |
+
+Fix every `"warning"` before rendering. `"info"` items are suggestions.
+
+### `render_pdf` / `render_html`
+
+Same arguments. `render_pdf` uses headless Chromium (3–15 s) and returns a base64 `application/pdf` resource. `render_html` is fast and returns standalone HTML with the same CSS.
+
+| Argument | Required | Meaning |
+| --- | --- | --- |
+| `markdown` | yes | The full GitHub-flavoured Markdown source (max 2 MB). Always pass the entire document — tools are stateless. |
+| `settings` | no | Document design settings. Every key is optional and merged over the defaults. When a user asks for a nice PDF, present these options (names below) so they can choose, then pass the chosen values here. |
+| `assets` | no | Embedded images as a map of name → data URL (`data:image/png;base64,…`, JPEG, SVG, WebP, GIF). Reference in Markdown as `![alt](asset:name)`. Max 24 images, 3 MB each, 8 MB total. Remote HTTPS images can be used in Markdown without this map. |
+| `fileName` | no | Preferred output file name without extension (max 120 chars). Defaults to the first H1 / inferred title. Do not include .pdf or .html. |
+
+### `settings` object
+
+Every key is optional. Unknown keys are ignored. Nested objects are merged field-by-field over the defaults.
+
+| Key | Type | Default | Allowed / notes |
+| --- | --- | --- | --- |
+| `theme` | enum | `clean` | Colour and typography theme. One of "clean", "corporate", "editorial", "forest", "mono", "midnight". Default "clean". |
+| `font` | enum | `inherit` | Body font. "inherit" uses the theme default. Otherwise one of "inter", "ibm-plex-sans", "roboto", "space-grotesk", "source-serif", "lora", "merriweather", "playfair". Default "inherit". |
+| `headingFont` | enum | `inherit` | Heading font. "inherit" uses the theme default. Otherwise one of "inter", "ibm-plex-sans", "roboto", "space-grotesk", "source-serif", "lora", "merriweather", "playfair". Default "inherit". |
+| `fontSize` | enum | `md` | Body size: "sm" = 9.5pt (Compact), "md" = 10.5pt (Comfortable), "lg" = 12pt (Large). Default "md". |
+| `accentColor` | hex string | theme accent | Override the theme accent as "#rgb" or "#rrggbb" (e.g. "#0F4C81"). Omit to keep the theme colour. Do not pass an empty string. |
+| `paperSize` | enum | `A4` | Page size: "A4" (A4), "Letter" (US Letter), "Legal" (US Legal). Default "A4". |
+| `orientation` | enum | `portrait` | "portrait" or "landscape". Default "portrait". Use landscape for wide tables. |
+| `margins` | enum | `normal` | Page margins: "narrow" (Narrow), "normal" (Normal), "wide" (Wide). Default "normal". |
+| `background` | enum | `none` | Subtle full-page texture: "none" (None), "soft" (Soft tint), "gradient" (Gradient), "dots" (Dots), "grid" (Grid), "lines" (Ruled lines). Default "none". |
+| `pageBreaks` | enum | `auto` | Pagination: "auto" (Automatic), "h1" (Before each H1), "h2" (Before each H1 & H2). Default "auto". |
+| `toc` | boolean | false | Insert a generated table of contents from ## / ### after the title. Default false. Do not write a TOC by hand. |
+| `headingNumbers` | boolean | false | Auto-number H1–H3 as 1 / 1.1 / 1.1.1. Default false. Do not number headings by hand. |
+| `justify` | boolean | false | Justify body paragraphs. Default false. |
+| `header` | object | see below | Running header. Partial object is fine. |
+| `header.text` | string ≤200 | empty | Running header (max 200 chars). "{title}" is replaced with the document title. Keep short; no emoji. |
+| `header.showDate` | boolean | false | Show today's date on the right of the header. Default false. |
+| `footer` | object | see below | Running footer. Partial object is fine. |
+| `footer.text` | string ≤200 | empty | Running footer (max 200 chars). Supports "{title}". Keep short; no emoji. |
+| `footer.pageNumbers` | boolean | true | Show page numbers. Default true. |
+| `footer.pageNumberStyle` | enum | `n-of-total` | "n-of-total" → "3 / 12", "n" → "3". Default "n-of-total". |
+| `cover` | object | see below | Cover page. Partial object is fine. |
+| `cover.enabled` | boolean | false | Full cover page before the document. Default false. |
+| `cover.title` | string ≤300 | document H1 | Cover title (max 300). Defaults to the document H1 when omitted or empty. |
+| `cover.subtitle` | string ≤500 | empty | Cover subtitle (max 500). |
+| `cover.author` | string ≤200 | empty | Cover author / prepared-by line (max 200). |
+| `cover.date` | string ≤100 | empty | Cover date line (max 100). Any string — not parsed. |
+| `cover.showLogo` | boolean | true | Draw the logo on the cover when a logo is set. Default true. |
+| `logo` | object or `null` | `null` | Set to `null` to remove a logo. Requires `dataUrl` when present. |
+| `logo.dataUrl` | data URL | — | PNG/JPEG/SVG/WebP/GIF as a data URL starting with "data:image/". Required if logo is set. |
+| `logo.name` | string ≤200 | `logo` | Optional logo file name (max 200). |
+| `logo.position` | enum | `title-right` | Placement: "title-right" (Beside title), "title-above" (Above title), "page-header" (Every page header), "watermark" (Watermark). Default "title-right". |
+| `logo.size` | enum | `md` | Height: "sm" (Small, 32px), "md" (Medium, 48px), "lg" (Large, 72px). Default "md". |
+| `logo.aspect` | number > 0 | `1` | width / height of the image, used when the logo is drawn in the page header. Optional; default 1. |
+
+#### Themes
+
+| Id | Name | Feel | Accent | Page | Default body / heading font |
+| --- | --- | --- | --- | --- | --- |
+| `clean` | Clean | Neutral, modern, blue accent | #2563EB | light | `inter` / `inter` |
+| `corporate` | Corporate | Navy headings, formal spacing | #0F4C81 | light | `ibm-plex-sans` / `ibm-plex-sans` |
+| `editorial` | Editorial | Serif body, warm paper tone | #B45309 | light | `source-serif` / `playfair` |
+| `forest` | Forest | Calm greens, soft contrast | #16A34A | light | `lora` / `lora` |
+| `mono` | Mono | Black on white, no color | #111111 | light | `space-grotesk` / `space-grotesk` |
+| `midnight` | Midnight | Dark slate, light text | #60A5FA | dark | `inter` / `inter` |
+
+#### Fonts
+
+Plus `"inherit"` on `font` / `headingFont` to keep the theme default.
+
+| Id | Name | Kind |
+| --- | --- | --- |
+| `inter` | Inter | sans |
+| `ibm-plex-sans` | IBM Plex Sans | sans |
+| `roboto` | Roboto | sans |
+| `space-grotesk` | Space Grotesk | sans |
+| `source-serif` | Source Serif 4 | serif |
+| `lora` | Lora | serif |
+| `merriweather` | Merriweather | serif |
+| `playfair` | Playfair Display | serif |
+
+#### Font sizes
+
+| Id | Name | Body |
+| --- | --- | --- |
+| `sm` | Compact | 9.5pt |
+| `md` | Comfortable | 10.5pt |
+| `lg` | Large | 12pt |
+
+#### Paper
+
+| Id | Name |
+| --- | --- |
+| `A4` | A4 |
+| `Letter` | US Letter |
+| `Legal` | US Legal |
+
+#### Margins
+
+| Id | Name |
+| --- | --- |
+| `narrow` | Narrow |
+| `normal` | Normal |
+| `wide` | Wide |
+
+#### Backgrounds
+
+| Id | Name |
+| --- | --- |
+| `none` | None |
+| `soft` | Soft tint |
+| `gradient` | Gradient |
+| `dots` | Dots |
+| `grid` | Grid |
+| `lines` | Ruled lines |
+
+#### Page breaks
+
+| Id | Name |
+| --- | --- |
+| `auto` | Automatic |
+| `h1` | Before each H1 |
+| `h2` | Before each H1 & H2 |
+
+#### Logo position and size
+
+| Id | Name |
+| --- | --- |
+| `title-right` | Beside title |
+| `title-above` | Above title |
+| `page-header` | Every page header |
+| `watermark` | Watermark |
+
+| Id | Name | Height |
+| --- | --- | --- |
+| `sm` | Small | 32px |
+| `md` | Medium | 48px |
+| `lg` | Large | 72px |
+
+Placeholders: `{title}` in `header.text` / `footer.text` becomes the document title (the first H1). Forced page break in Markdown: `\\pagebreak` or `<!-- pagebreak -->` on its own line. Image size hint: `![alt](url =WIDTHxHEIGHT)` (either dimension may be omitted, e.g. `=300x`).
+
+### Prompt arguments
+
+**`write_document`**
+
+| Argument | Required | Meaning |
+| --- | --- | --- |
+| `brief` | yes | What the document is about, who it is for, and any facts to include. |
+| `kind` | no | One of `"report"`, `"proposal"`, `"readme"`, `"meeting"`, `"invoice"`, `"resume"`, `"other"`. |
+
+**`polish_markdown`**
+
+| Argument | Required | Meaning |
+| --- | --- | --- |
+| `markdown` | yes | Existing Markdown to reformat without changing meaning. |
+
+**`make_pdf`**
+
+| Argument | Required | Meaning |
+| --- | --- | --- |
+| `brief` | no | What to write if there is no Markdown yet. |
+| `markdown` | no | Existing Markdown to render. |
+| `audience` | no | Who will read it (affects theme and density recommendations). |
+
+Limits: Markdown ≤ 2 MB; 24 images; 3 MB per image; 8 MB images combined.
+
