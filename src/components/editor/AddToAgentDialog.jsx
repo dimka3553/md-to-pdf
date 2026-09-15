@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import * as I from '../icons';
 import { Button, Dialog, cx } from '../ui';
 import { useToast } from '../Toast';
@@ -36,9 +36,9 @@ function AgentBadge({ agent, size = 'md' }) {
   );
 }
 
+// Rendered with key={agent.id} so local state (the manual-config toggle) resets when the agent changes.
 function Details({ agent, plan, url, launched, onLaunch, onCopy }) {
   const [showManual, setShowManual] = useState(false);
-  useEffect(() => setShowManual(false), [agent.id]);
 
   const kindLabel = plan.kind === 'deeplink' ? 'One-click' : plan.kind === 'cli' ? 'Terminal' : 'Manual';
 
@@ -72,7 +72,7 @@ function Details({ agent, plan, url, launched, onLaunch, onCopy }) {
             </Button>
             {plan.webHref && (
               <a href={plan.webHref} target="_blank" rel="noreferrer" className="text-xs text-brand-700 underline-offset-2 hover:underline dark:text-brand-300">
-                Didn't open? Use the web link
+                Didn&apos;t open? Use the web link
               </a>
             )}
           </div>
@@ -105,33 +105,37 @@ function Details({ agent, plan, url, launched, onLaunch, onCopy }) {
       )}
 
       <div className="mt-auto rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400">
-        Once connected, just ask your agent: <em className="text-gray-700 dark:text-gray-200">"Write a project proposal and export it as a PDF with Markdown Studio."</em> It reads the authoring guide, lints the Markdown and renders the PDF on its own.
+        Once connected, just ask your agent: <em className="text-gray-700 dark:text-gray-200">&ldquo;Write a project proposal and export it as a PDF with Markdown Studio.&rdquo;</em> It reads the authoring guide, lints the Markdown and renders the PDF on its own.
         <span className="sr-only">{url}</span>
       </div>
     </div>
   );
 }
 
+const isBrowser = typeof window !== 'undefined';
+
+function readLastAgent() {
+  if (!isBrowser) return null;
+  try {
+    const last = localStorage.getItem(LAST_AGENT_KEY);
+    return last && getAgent(last) ? last : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AddToAgentDialog({ open, onClose }) {
   const toast = useToast();
-  const [selectedId, setSelectedId] = useState(null);
+  // The dialog's body is only rendered client-side after a user action, so reading
+  // window/localStorage in the initializers cannot cause a hydration mismatch.
+  const [selectedId, setSelectedId] = useState(readLastAgent);
   const [launched, setLaunched] = useState(false);
-  const [origin, setOrigin] = useState('');
+  const [origin] = useState(() => (isBrowser ? window.location.origin : ''));
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    setOrigin(window.location.origin);
-    try {
-      const last = localStorage.getItem(LAST_AGENT_KEY);
-      if (last && getAgent(last)) setSelectedId(last);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!open) setLaunched(false);
-  }, [open]);
+  const close = useCallback(() => {
+    setLaunched(false);
+    onClose();
+  }, [onClose]);
 
   const url = useMemo(() => mcpUrl(origin || undefined), [origin]);
   const agent = selectedId ? getAgent(selectedId) : null;
@@ -171,7 +175,7 @@ export function AddToAgentDialog({ open, onClose }) {
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={close}
       title="Add to AI agent"
       description="Connect the Markdown Studio MCP server so your coding agent writes better-formatted Markdown and exports PDFs — free, no sign-up."
       width="max-w-3xl"
@@ -180,7 +184,7 @@ export function AddToAgentDialog({ open, onClose }) {
           <a href="https://github.com/dimka3553/md-to-pdf#for-ai-agents-mcp" target="_blank" rel="noreferrer" className="mr-auto inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
             <I.Book className="h-3.5 w-3.5" /> Docs &amp; plugin install
           </a>
-          <Button variant="primary" onClick={onClose}>Done</Button>
+          <Button variant="primary" onClick={close}>Done</Button>
         </>
       }
     >
@@ -222,7 +226,7 @@ export function AddToAgentDialog({ open, onClose }) {
 
         <div className="min-h-[260px] rounded-xl border border-gray-200 p-4 dark:border-gray-700">
           {agent && plan ? (
-            <Details agent={agent} plan={plan} url={url} launched={launched} onLaunch={() => launch(plan)} onCopy={copy} />
+            <Details key={agent.id} agent={agent} plan={plan} url={url} launched={launched} onLaunch={() => launch(plan)} onCopy={copy} />
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
               <I.Bot className="h-8 w-8 text-gray-300 dark:text-gray-600" />

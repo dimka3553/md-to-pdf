@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import * as I from '../icons';
 import { Button, IconButton, Segmented, cx } from '../ui';
 
@@ -92,10 +93,10 @@ export default function TopBar({ fileName, onFileNameChange, actions, viewMode, 
   return (
     <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-2 dark:border-gray-800 dark:bg-gray-900 sm:px-3">
       <div className="flex min-w-0 items-center gap-1">
-        <a href="/" className="mr-1 flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Markdown Studio">
+        <Link href="/" className="mr-1 flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Markdown Studio">
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-600 text-[11px] font-black text-white">M↓</span>
           <span className="hidden text-sm font-semibold text-gray-900 lg:inline dark:text-gray-100">Markdown Studio</span>
-        </a>
+        </Link>
         <FileMenu actions={actions} isMac={isMac} />
         <span className="hidden h-5 w-px bg-gray-200 sm:inline dark:bg-gray-700" />
         <div className="hidden sm:block">
