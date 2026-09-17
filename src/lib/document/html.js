@@ -312,7 +312,7 @@ function runningContent(settings, docTitle) {
 /** HTML for the simulated header/footer bands shown in the live preview. */
 function runningParts(settings, design, docTitle) {
   const r = runningContent(settings, docTitle);
-  const logoImg = r.headerLogo ? `<img src="${r.headerLogo.dataUrl}" alt="" style="height:${HEADER_LOGO_HEIGHT}px;width:${headerLogoWidth(r.headerLogo)}px;object-fit:contain;object-position:left center">` : '';
+  const logoImg = r.headerLogo ? `<img src="${r.headerLogo.dataUrl}" alt="" style="height:${HEADER_LOGO_HEIGHT}px;width:${headerLogoWidth(r.headerLogo)}px;object-fit:contain;object-position:left center;${r.headerText ? 'transform:translateY(-1px)' : ''}">` : '';
   const pageNumber = r.pageNumbers ? (r.pageNumbers === 'n' ? '<span class="pageNumber">1</span>' : '<span class="pageNumber">1</span> / <span class="totalPages">N</span>') : '';
   return {
     headerLeft: `<span class="running-brand">${logoImg}${r.headerText ? `<span>${escapeHtml(r.headerText)}</span>` : ''}</span>`,
@@ -353,11 +353,13 @@ function buildPageCss(settings, design, docTitle) {
   const base = `font-family: ${design.font.family}; font-size: 8pt; color: ${t.muted}; vertical-align: middle; -webkit-print-color-adjust: exact;`;
   const box = (name, content, extra = '') => (content ? `@${name} { content: ${content}; ${base} ${extra} }` : '');
 
+  // Apply a 1px optical lift when text accompanies the logo: visible glyphs
+  // sit above the line-box center. Keep standalone logos geometrically centered.
   // A background centers the logo independently of the text baseline. Generate
   // the box for logo-only headers too, but reserve a gap only when text exists.
   const headerLeft = r.headerLogo || r.headerText ? cssString(r.headerText) : '';
   const headerLogoStyle = r.headerLogo
-    ? `background-image: url(${cssString(headerLogoUrl(r.headerLogo))}); background-repeat: no-repeat; background-position: left center; background-size: ${headerLogoWidth(r.headerLogo)}px ${HEADER_LOGO_HEIGHT}px; padding-left: ${headerLogoWidth(r.headerLogo) + (r.headerText ? 8 : 0)}px;`
+    ? `background-image: url(${cssString(headerLogoUrl(r.headerLogo))}); background-repeat: no-repeat; background-position: left ${r.headerText ? 'calc(50% - 1px)' : 'center'}; background-size: ${headerLogoWidth(r.headerLogo)}px ${HEADER_LOGO_HEIGHT}px; padding-left: ${headerLogoWidth(r.headerLogo) + (r.headerText ? 8 : 0)}px;`
     : '';
   const headerRight = r.dateText ? cssString(r.dateText) : '';
   const pageCounter = r.pageNumbers ? (r.pageNumbers === 'n' ? 'counter(page)' : 'counter(page) " / " counter(pages)') : '';
