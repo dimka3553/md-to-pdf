@@ -71,7 +71,7 @@ export const FIELD_HELP = {
     .join(', ')}. Default "${DEFAULT_SETTINGS.background}".`,
   pageBreaks: `Pagination: ${Object.entries(PAGE_BREAK_MODES)
     .map(([k, v]) => `"${k}" (${v.name})`)
-    .join(', ')}. Default "${DEFAULT_SETTINGS.pageBreaks}".`,
+    .join(', ')}. Default "${DEFAULT_SETTINGS.pageBreaks}". Auto keeps headings and short introductions with compact tables/blocks, and the opening rows of longer tables. For an editorial break, put \\pagebreak on a separate paragraph BEFORE the section heading. Inspect the rendered PDF after layout changes.`,
   toc: `Insert a generated table of contents from ## / ### (after the title, or on its own page when a cover is on). Default ${DEFAULT_SETTINGS.toc}. Do not write a TOC by hand.`,
   headingNumbers: `Auto-number H1–H3 as 1 / 1.1 / 1.1.1. Default ${DEFAULT_SETTINGS.headingNumbers}. Do not number headings by hand.`,
   justify: `Justify body paragraphs. Default ${DEFAULT_SETTINGS.justify}.`,

@@ -3,7 +3,7 @@ name: markdown-studio
 description: Write well-formatted Markdown documents and export them as polished PDFs with Markdown Studio. Use when asked to write, format, polish or export a report, proposal, README, meeting notes, invoice, résumé or any document destined for PDF/print, or when Markdown must render correctly in Markdown Studio (md-to-pdf).
 ---
 
-<!-- Generated from src/lib/mcp/guide.js (v1.3.0) by scripts/build-skill.mjs — do not edit by hand. -->
+<!-- Generated from src/lib/mcp/guide.js (v1.4.0) by scripts/build-skill.mjs — do not edit by hand. -->
 
 ## Tooling
 
@@ -83,7 +83,7 @@ Lists may contain paragraphs, code blocks and tables when indented to the item's
 
 ### Tables
 
-Tables are the strongest tool for structured content: they get striped rows, a coloured header row and never break awkwardly.
+Tables get striped rows and a coloured header. Compact tables stay together; longer tables split between rows and repeat their header.
 
 ```md
 | Metric | Q2 | Q3 | Change |
@@ -170,6 +170,33 @@ Footnotes are collected under a "Footnotes" divider at the end of the document.
 ### Page breaks
 
 Put `\pagebreak` (or `<!-- pagebreak -->`) on its own line, surrounded by blank lines, to force a new page. Or set `settings.pageBreaks` to `"h1"` / `"h2"` for automatic breaks before every H1 / H1+H2.
+
+Use `settings.pageBreaks: "auto"` by default. Pagination uses the rendered size, including fonts, paper, margins, images and running headers/footers:
+- Headings stay with their opening content. Up to two short introductory paragraphs (each at most three rendered lines) stay with the heading.
+- A heading, introduction and following table/list/figure/code block stay together when that opening fits within half a usable page. Compact tables up to 40% of a usable page also stay intact on their own.
+- For longer tables, the heading and short introduction stay with the table header and first two body rows when that opening fits within half a page. The remaining rows can flow onto later pages with repeated headers. Exceptionally tall rows/blocks may need to split.
+- Paragraphs avoid leaving fewer than three lines on either side of a page break. A divider immediately before a heading stays with that heading.
+- There is no rule that every heading below the halfway point must move: keep it on the current page when a useful opening fits. Avoid forcing every small subsection onto a fresh page.
+
+For an intentional section boundary, put the marker **before the heading**, never between its introduction and table:
+
+```md
+End of the previous section.
+
+\pagebreak
+
+## Pay
+
+All amounts are in USD per month.
+
+| Item | Amount |
+| --- | ---: |
+| Base pay | 1,500 |
+```
+
+The marker is invisible in the PDF; the editor toolbar's **Page break** button inserts it. `\newpage`, `<!-- page-break -->`, `<!-- newpage -->` and `---pagebreak---` are aliases. Markers inside code examples are literal text. `---` is a visual divider, not a page break.
+
+After rendering, inspect the actual PDF page transitions. If a section needs an editorial break, insert the marker before its heading and render again. Do not guess page positions from Markdown line counts or pad with blank lines. Recheck manual breaks after changing paper, fonts, margins or content. `analyze_markdown` checks syntax, not physical page layout; the live preview estimates long-block splits, while the PDF is authoritative.
 
 ### Horizontal rule
 
@@ -348,7 +375,7 @@ Every key is optional. Unknown keys are ignored. Nested objects are merged field
 | `orientation` | enum | `portrait` | "portrait" or "landscape". Default "portrait". Use landscape for wide tables. |
 | `margins` | enum | `normal` | Page margins: "narrow" (Narrow), "normal" (Normal), "wide" (Wide). Default "normal". |
 | `background` | enum | `none` | Subtle full-page texture: "none" (None), "soft" (Soft tint), "gradient" (Gradient), "dots" (Dots), "grid" (Grid), "lines" (Ruled lines). Default "none". |
-| `pageBreaks` | enum | `auto` | Pagination: "auto" (Automatic), "h1" (Before each H1), "h2" (Before each H1 & H2). Default "auto". |
+| `pageBreaks` | enum | `auto` | Pagination: "auto" (Automatic), "h1" (Before each H1), "h2" (Before each H1 & H2). Default "auto". Auto keeps headings and short introductions with compact tables/blocks, and the opening rows of longer tables. For an editorial break, put \pagebreak on a separate paragraph BEFORE the section heading. Inspect the rendered PDF after layout changes. |
 | `toc` | boolean | false | Insert a generated table of contents from ## / ### (after the title, or on its own page when a cover is on). Default false. Do not write a TOC by hand. |
 | `headingNumbers` | boolean | false | Auto-number H1–H3 as 1 / 1.1 / 1.1.1. Default false. Do not number headings by hand. |
 | `justify` | boolean | false | Justify body paragraphs. Default false. |

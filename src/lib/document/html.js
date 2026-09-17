@@ -1,6 +1,7 @@
 import { CODE_FONT, LOGO_SIZES, normalizeSettings, resolveDesign } from './settings.js';
 import { markdownToHtml, extractHeadings } from './markdown.js';
 import { buildStyles } from './styles.js';
+import { preparePagination } from './pagination.js';
 import { escapeHtml, formatDate, inferTitle } from './utils.js';
 
 const MERMAID_SRC = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
@@ -140,6 +141,7 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
   function keepTogether(el, h) {
     if (h > perPage * 0.9) return false;
     if (el.classList.contains('cover') || el.classList.contains('toc-page')) return false;
+    if (el.classList.contains('keep-block')) return true;
     if (/^H[1-6]$/.test(el.tagName) || el.classList.contains('title-block')) return true;
     if (el.matches('figure, blockquote, .markdown-alert, hr, .logo-above')) return true;
     if (el.classList.contains('code-block')) return (parseInt(el.getAttribute('data-lines'), 10) || 99) <= 28;
@@ -155,25 +157,27 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
     gap.appendChild(c);
   }
   function paginate() {
-    if (!preview) return 1;
     cleanupPagination();
+    var sectionEnds = (${preparePagination.toString()})(doc, perPage, pageBreaks);
+    if (!preview) return 1;
     var pageTop = 0, limit = perPage, pageNo = 1, forceBreak = false;
     var docTop = function () { return doc.getBoundingClientRect().top; };
     var guard = 0;
     for (var i = 0; i < doc.children.length && guard++ < 5000; i++) {
       var el = doc.children[i];
       if (el.classList.contains('page-gap') || el.classList.contains('page-guide')) continue;
-      if (el.classList.contains('page-break')) { forceBreak = true; continue; }
+      if (el.classList.contains('page-break')) { if (!el.hidden) forceBreak = true; continue; }
       var base = docTop(), r = el.getBoundingClientRect();
       var top = r.top - base, bottom = r.bottom - base, h = bottom - top;
-      var headingBreak = pageBreaks === 'h2'
-        ? (el.tagName === 'H1' || el.tagName === 'H2' || el.classList.contains('title-block'))
-        : pageBreaks === 'h1'
-          ? (el.tagName === 'H1' || el.classList.contains('title-block'))
-          : false;
-      var startsNewPage = forceBreak || top >= limit - 0.5 || (headingBreak && top > pageTop + 1);
+      var headingBreak = el.classList.contains('heading-page-start');
+      var startsNewPage = (forceBreak && top > pageTop + 1) || top >= limit - 0.5 || (headingBreak && top > pageTop + 1);
+      forceBreak = forceBreak && top > pageTop + 1;
 
       if (!startsNewPage && bottom > limit + 0.5 && keepTogether(el, h) && top > pageTop + 1) startsNewPage = true;
+
+      var sectionEnd = sectionEnds.get(el);
+      if (!startsNewPage && sectionEnd && top > pageTop + 1
+          && sectionEnd.getBoundingClientRect().bottom - base > limit + 0.5) startsNewPage = true;
 
       // Headings stay with the block that follows them.
       if (!startsNewPage && (/^H[1-6]$/.test(el.tagName) || el.classList.contains('title-block')) && top > pageTop + 1) {

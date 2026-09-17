@@ -96,7 +96,10 @@ export function buildStyles(design, settings, mode) {
         : `
     html { background: ${t.background}; }
     .sheet, .sheet-inner { position: relative; }
-    .page-break { break-before: page; page-break-before: always; height: 0; margin: 0; }
+    /* Measure at print width before Chromium performs page fragmentation. */
+    .sheet { width: ${design.pageWidth - 2 * mx}px; }
+    .page-break { display: none; }
+    .manual-page-start, .heading-page-start { break-before: page; page-break-before: always; }
     .cover { height: ${design.pageHeight - (my + (design.hasRunningHeader ? 30 : 0)) - (my + (design.hasRunningFooter ? 30 : 0)) - 4}px; break-after: page; page-break-after: always; }
     `
     }
@@ -107,6 +110,8 @@ export function buildStyles(design, settings, mode) {
       ${backgroundCss}
     }
     .doc { position: relative; z-index: 1; }
+    .keep-next { break-after: avoid; page-break-after: avoid; }
+    .keep-block { break-inside: avoid; page-break-inside: avoid; }
 
     /* ---------- Watermark ---------- */
     .watermark {
@@ -178,8 +183,6 @@ export function buildStyles(design, settings, mode) {
     h6 { font-size: .9em; color: ${t.muted}; }
     .doc > h1:first-child, .doc > .title-block:first-child { margin-top: 0; }
     .heading-number { color: ${t.accent}; font-weight: 600; margin-right: .35em; font-variant-numeric: tabular-nums; }
-    ${settings.pageBreaks !== 'auto' && !isPreview ? `.doc h1:not(:first-child):not(.cover-title) { break-before: page; page-break-before: always; }` : ''}
-    ${settings.pageBreaks === 'h2' && !isPreview ? `.doc h2 { break-before: page; page-break-before: always; }` : ''}
     .title-block + h2, h1 + h2, .toc + h2 { margin-top: 1em; }
 
     /* ---------- Text ---------- */

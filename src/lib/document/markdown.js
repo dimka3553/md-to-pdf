@@ -93,6 +93,15 @@ export function createParser(opts = {}) {
   marked.use({
     gfm: true,
     breaks: false,
+    extensions: [{
+      name: 'pageBreak',
+      level: 'block',
+      tokenizer(src) {
+        const match = /^(?: {0,3})(?:\\(?:pagebreak|newpage)|<!--\s*(?:pagebreak|page-break|newpage)\s*-->|---pagebreak---)[\t ]*(?:\n[\t ]*\n|\n?$)/i.exec(src);
+        if (match) return { type: 'pageBreak', raw: match[0] };
+      },
+      renderer() { return '<div class="page-break"></div>\n'; },
+    }],
     renderer: {
       code({ text, lang: info }) {
         const { lang, title } = parseInfo(info);
@@ -195,10 +204,6 @@ export function createParser(opts = {}) {
 export function markdownToHtml(markdown, opts = {}) {
   const parser = createParser(opts);
   let html = parser.parse(markdown || '', { async: false });
-
-  // Page break directives: a paragraph containing only "\pagebreak", "<!-- pagebreak -->" or "---pagebreak---"
-  html = html.replace(/<p>\\?(pagebreak|newpage)<\/p>\n?/gi, '<div class="page-break"></div>\n');
-  html = html.replace(/<!--\s*(pagebreak|page-break|newpage)\s*-->/gi, '<div class="page-break"></div>');
 
   if (opts.emoji !== false) {
     html = twemoji.parse(html, {

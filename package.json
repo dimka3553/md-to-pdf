@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test": "node --test tests/*.test.mjs",
     "build:skill": "node scripts/build-skill.mjs"
   },
   "dependencies": {
@@ -39,6 +40,7 @@
     "autoprefixer": "^10.4.19",
     "eslint": "^9",
     "eslint-config-next": "^16.3.5",
+    "pdfjs-dist": "^5.6.205",
     "postcss": "^8.5.28",
     "tailwindcss": "^4"
   }

@@ -20,7 +20,7 @@ A Markdown editor that exports polished, print-ready PDFs — with a live previe
 - Logo: beside the title, above the title, in the page header, on the cover, or as a watermark
 - Running header (text, date) and footer (text, page numbers)
 - Cover page, table of contents, numbered headings
-- Page-break control: automatic (smart), before every H1, or before every H1 and H2; manual `\pagebreak`
+- Page-break control: smart section openings and compact tables, before every H1, or before every H1 and H2; manual `\pagebreak`
 
 **Markdown**
 - GitHub-flavoured Markdown, task lists, tables, footnotes
@@ -115,11 +115,33 @@ npm install
 npm run dev
 ```
 
+`npm test` runs parser checks and real Chromium PDF pagination regressions (using the same local Chrome setup as PDF export). `npm run lint` and `npm run build` check the app.
+
 PDFs are rendered with headless Chromium. Locally, an installed Google Chrome is used automatically (or set `PUPPETEER_EXECUTABLE_PATH`). On Vercel/Lambda, `@sparticuz/chromium-min` downloads a matching Chromium build at runtime.
 
 Environment variables (all optional): `NEXT_PUBLIC_SITE_URL` (public URL used in metadata and MCP responses), `MCP_API_KEY` (protects `/api/mcp`), `PUPPETEER_EXECUTABLE_PATH`.
 
 ## API
+
+### Pagination
+
+Automatic pagination keeps headings with up to two short introductory paragraphs and the following compact table, list, figure, or code block when that opening fits within half a usable page. Standalone tables up to 40% of a page stay intact. Longer tables can split between rows, repeat their headers, and keep their first two rows with the section opening when it fits. Paragraphs protect three lines on either side of a break. A heading can start halfway down a page when enough content fits below it.
+
+For precise control, insert `\pagebreak` (or `<!-- pagebreak -->`) on its own line with blank lines around it, **before the heading**:
+
+```md
+End of the previous section.
+
+\pagebreak
+
+## Pay
+
+All amounts are in USD per month.
+```
+
+The toolbar's **Page break** button inserts this marker. It is invisible in the PDF. `\newpage`, `<!-- page-break -->`, `<!-- newpage -->`, and `---pagebreak---` are also supported; code examples remain literal. `---` alone is a divider, not a page break. Use `settings.pageBreaks: "h1"` or `"h2"` to start every H1 or H1/H2 on a new page.
+
+Check the PDF after changing content or design settings. The live preview estimates splits inside long blocks; the PDF is authoritative. The MCP guide and generated agent skill explain the same rules, and `analyze_markdown` checks marker syntax rather than physical page positions.
 
 ### `POST /api/convert`
 

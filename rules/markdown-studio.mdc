@@ -11,7 +11,7 @@ globs:
 When a Markdown file is meant to become a PDF or printed document:
 
 1. Call the `get_markdown_guide` tool from the `markdown-studio` MCP server (or read the `markdown-studio` skill) before writing.
-2. Structure: one `#` title, `##` sections, no skipped heading levels, tables for structured data, `> [!NOTE]`-style callouts, languages on every code fence, `\pagebreak` on its own line for manual breaks.
+2. Structure: one `#` title, `##` sections, no skipped heading levels, tables for structured data, `> [!NOTE]`-style callouts, languages on every code fence. Automatic pagination keeps section openings with compact tables or the opening rows of longer tables. Put `\pagebreak` on its own line with blank lines around it **before a heading** for deliberate breaks; never separate a heading/introduction from its table. Inspect the rendered PDF and adjust breaks after content or design changes.
 3. Do not hand-write a table of contents or heading numbers — pass `settings.toc` / `settings.headingNumbers` instead.
 4. Avoid LaTeX math, HTML layout tags and YAML front-matter: they do not render.
 5. Run `analyze_markdown` and fix all warnings, then `render_pdf` with settings from the closest template (`list_templates`).

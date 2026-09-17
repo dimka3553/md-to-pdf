@@ -34,8 +34,8 @@ Recommended flow:
 1. Call get_markdown_guide once per session and follow it — it lists which syntax renders (no LaTeX, no HTML layouts, no YAML front-matter) and every tool/settings argument.
 2. Optionally call list_templates / get_template for a proven structure and matching design settings.
 3. Agree settings with the user (or apply the matching recipe if they want you to decide).
-4. Write the Markdown, then call analyze_markdown and fix every warning.
-5. Call render_pdf (PDF as a base64 resource) or render_html.
+4. Write the Markdown, then call analyze_markdown and fix every warning. Default to automatic pagination; for deliberate section boundaries put \\pagebreak on its own paragraph BEFORE the heading, never between its introduction and table. See the guide's Page breaks rules.
+5. Call render_pdf (PDF as a base64 resource) or render_html. Inspect PDF page transitions and re-render with explicit breaks where needed; analyze_markdown cannot assess physical page layout.
 6. Immediately save the PDF and open it for the user inside the client's own inline surface (in Cursor: a canvas embedding the PDF) — never in an external viewer or browser, and without asking first. Details under "After rendering" below.
 All tools are stateless; pass the full markdown each time.
 

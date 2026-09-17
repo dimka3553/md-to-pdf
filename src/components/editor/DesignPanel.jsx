@@ -177,7 +177,7 @@ export default function DesignPanel({ settings, onChange, onLogoFile, onClose })
               ))}
             </div>
           </Field>
-          <Field label="Page breaks" hint="Automatic keeps headings with their content and only splits long blocks where needed.">
+          <Field label="Page breaks" hint="Automatic keeps headings, short introductions and compact tables together. Use the toolbar’s Page break before a heading to start it on a fresh page.">
             <Select value={settings.pageBreaks} onChange={(e) => set({ pageBreaks: e.target.value })}>
               {Object.entries(PAGE_BREAK_MODES).map(([id, m]) => <option key={id} value={id}>{m.name}</option>)}
             </Select>
