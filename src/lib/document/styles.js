@@ -58,7 +58,7 @@ export function buildStyles(design, settings, mode) {
       display: flex; align-items: center; justify-content: space-between; gap: 12px;
       font-size: 8pt; color: ${t.muted}; pointer-events: none;
     }
-    .running.top { top: ${Math.round(my * 0.55)}px; }
+    .running.top { line-height: 14px; top: ${Math.round(my * 0.55)}px; }
     .running.bottom { bottom: ${Math.round(my * 0.55)}px; }
     .running-brand { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
     .running img { height: 16px; width: auto; display: block; flex-shrink: 0; }

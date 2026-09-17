@@ -216,6 +216,7 @@ Every nested field, enum, default and tool argument is listed at the end of this
 
 ## Recipes
 
+- **Branded running header** — set `logo.position: "page-header"`, `logo.dataUrl`, `logo.aspect` (image width / height), and `header.text` together. The logo and text are vertically centered with an 8px gap; logo-only and text-only headers have no extra gap. Header logos are 14px tall with width capped at 160px; `logo.size` applies to title placements. `header.showDate` adds the date on the right. Do not imitate a running header with a Markdown image or spaces.
 - **Business report** — `corporate`, `toc`, `headingNumbers`, `cover.enabled`, `header.text: "{title}"`, `footer.text: "Confidential"`, `pageBreaks: "h1"`. Start with an *Executive summary* and a KPI table.
 - **Proposal / statement of work** — `editorial`, cover off, header `"Proposal — {title}"`; sections Overview → Objectives → Scope (phases as `###`) → Timeline (mermaid `gantt`) → Investment table → Acceptance table with signature rows.
 - **README / technical doc** — `clean`, `toc`; titled code blocks, an options table (`Option | Type | Default | Description`), `> [!WARNING]` for gotchas.
@@ -352,7 +353,7 @@ Every key is optional. Unknown keys are ignored. Nested objects are merged field
 | `headingNumbers` | boolean | false | Auto-number H1–H3 as 1 / 1.1 / 1.1.1. Default false. Do not number headings by hand. |
 | `justify` | boolean | false | Justify body paragraphs. Default false. |
 | `header` | object | see below | Running header. Partial object is fine. |
-| `header.text` | string ≤200 | empty | Running header (max 200 chars). "{title}" is replaced with the document title. Keep short; no emoji. |
+| `header.text` | string ≤200 | empty | Running header (max 200 chars). "{title}" is replaced with the document title. Keep short; no emoji. To pair text with a logo on every page, also set logo.position="page-header" and logo.aspect to the image width / height. Logo and text are vertically centered with an 8px gap only when both are present; either may be used alone. |
 | `header.showDate` | boolean | false | Show today's date on the right of the header. Default false. |
 | `footer` | object | see below | Running footer. Partial object is fine. |
 | `footer.text` | string ≤200 | empty | Running footer (max 200 chars). Supports "{title}". Keep short; no emoji. |

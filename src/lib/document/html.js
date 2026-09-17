@@ -301,7 +301,7 @@ function runningContent(settings, docTitle) {
   // Margin boxes use the page font, which has no emoji glyphs; strip pictographs from the title.
   const plainTitle = docTitle.replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, '').replace(/\s{2,}/g, ' ').trim() || docTitle;
   return {
-    headerText: settings.header.text.replace(/\{title\}/gi, plainTitle),
+    headerText: settings.header.text.replace(/\{title\}/gi, plainTitle).trim(),
     dateText: settings.header.showDate ? formatDate() : '',
     footerText: settings.footer.text.replace(/\{title\}/gi, plainTitle),
     pageNumbers: settings.footer.pageNumbers ? settings.footer.pageNumberStyle : null,
@@ -312,10 +312,10 @@ function runningContent(settings, docTitle) {
 /** HTML for the simulated header/footer bands shown in the live preview. */
 function runningParts(settings, design, docTitle) {
   const r = runningContent(settings, docTitle);
-  const logoImg = r.headerLogo ? `<img src="${r.headerLogo.dataUrl}" alt="" style="height:${HEADER_LOGO_HEIGHT}px;width:auto">` : '';
+  const logoImg = r.headerLogo ? `<img src="${r.headerLogo.dataUrl}" alt="" style="height:${HEADER_LOGO_HEIGHT}px;width:${headerLogoWidth(r.headerLogo)}px;object-fit:contain;object-position:left center">` : '';
   const pageNumber = r.pageNumbers ? (r.pageNumbers === 'n' ? '<span class="pageNumber">1</span>' : '<span class="pageNumber">1</span> / <span class="totalPages">N</span>') : '';
   return {
-    headerLeft: `<span class="running-brand">${logoImg}${escapeHtml(r.headerText)}</span>`,
+    headerLeft: `<span class="running-brand">${logoImg}${r.headerText ? `<span>${escapeHtml(r.headerText)}</span>` : ''}</span>`,
     headerRight: `<span>${escapeHtml(r.dateText)}</span>`,
     footerLeft: `<span>${escapeHtml(r.footerText)}</span>`,
     footerRight: `<span>${pageNumber}</span>`,
@@ -329,13 +329,14 @@ function cssString(text) {
   return `"${String(text).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r?\n/g, ' ')}"`;
 }
 
-/**
- * Wrap a bitmap data URL in an SVG with explicit dimensions so it can be used
- * as `content: url()` (which always renders images at their intrinsic size).
- */
-function sizedImageUrl(dataUrl, height, aspect) {
-  const width = Math.max(height, Math.min(160, Math.round(height * (aspect || 1))));
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><image href="${dataUrl}" xlink:href="${dataUrl}" width="${width}" height="${height}" preserveAspectRatio="xMinYMid meet"/></svg>`;
+/** Shared logo bounds keep preview and printed headers identical. */
+function headerLogoWidth(logo) {
+  return Math.max(1, Math.min(160, Math.round(HEADER_LOGO_HEIGHT * logo.aspect)));
+}
+
+function headerLogoUrl(logo) {
+  const width = headerLogoWidth(logo);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${HEADER_LOGO_HEIGHT}"><image href="${escapeHtml(logo.dataUrl)}" width="${width}" height="${HEADER_LOGO_HEIGHT}" preserveAspectRatio="xMinYMid meet"/></svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
@@ -352,12 +353,12 @@ function buildPageCss(settings, design, docTitle) {
   const base = `font-family: ${design.font.family}; font-size: 8pt; color: ${t.muted}; vertical-align: middle; -webkit-print-color-adjust: exact;`;
   const box = (name, content, extra = '') => (content ? `@${name} { content: ${content}; ${base} ${extra} }` : '');
 
-  const headerLeft = [
-    r.headerLogo ? `url(${cssString(sizedImageUrl(r.headerLogo.dataUrl, HEADER_LOGO_HEIGHT, r.headerLogo.aspect))})` : '',
-    r.headerText ? cssString((r.headerLogo ? '\u00a0\u00a0' : '') + r.headerText) : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  // A background centers the logo independently of the text baseline. Generate
+  // the box for logo-only headers too, but reserve a gap only when text exists.
+  const headerLeft = r.headerLogo || r.headerText ? cssString(r.headerText) : '';
+  const headerLogoStyle = r.headerLogo
+    ? `background-image: url(${cssString(headerLogoUrl(r.headerLogo))}); background-repeat: no-repeat; background-position: left center; background-size: ${headerLogoWidth(r.headerLogo)}px ${HEADER_LOGO_HEIGHT}px; padding-left: ${headerLogoWidth(r.headerLogo) + (r.headerText ? 8 : 0)}px;`
+    : '';
   const headerRight = r.dateText ? cssString(r.dateText) : '';
   const pageCounter = r.pageNumbers ? (r.pageNumbers === 'n' ? 'counter(page)' : 'counter(page) " / " counter(pages)') : '';
   const footerLeft = r.footerText ? cssString(r.footerText) : '';
@@ -366,7 +367,7 @@ function buildPageCss(settings, design, docTitle) {
     size: ${settings.paperSize} ${settings.orientation};
     margin: ${top}px ${x}px ${bottom}px ${x}px;
     background: ${t.background};
-    ${box('top-left', headerLeft, `text-align: left; line-height: ${HEADER_LOGO_HEIGHT}px;`)}
+    ${box('top-left', headerLeft, `text-align: left; line-height: ${HEADER_LOGO_HEIGHT}px; ${headerLogoStyle}`)}
     ${box('top-right', headerRight, 'text-align: right;')}
     ${box('bottom-left', footerLeft, 'text-align: left;')}
     ${box(footerLeft ? 'bottom-right' : 'bottom-center', pageCounter, (footerLeft ? 'text-align: right;' : 'text-align: center;') + ' font-variant-numeric: tabular-nums;')}

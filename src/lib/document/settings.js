@@ -286,7 +286,7 @@ export function resolveDesign(settings) {
     margins: MARGINS[settings.margins],
     pageWidth,
     pageHeight,
-    hasRunningHeader: !!(settings.header.text || settings.header.showDate || settings.logo?.position === 'page-header'),
+    hasRunningHeader: !!(settings.header.text.trim() || settings.header.showDate || settings.logo?.position === 'page-header'),
     hasRunningFooter: !!(settings.footer.text || settings.footer.pageNumbers),
   };
 }

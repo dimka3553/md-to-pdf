@@ -193,6 +193,7 @@ Every nested field, enum, default and tool argument is listed at the end of this
 
 ## Recipes
 
+- **Branded running header** — set \`logo.position: "page-header"\`, \`logo.dataUrl\`, \`logo.aspect\` (image width / height), and \`header.text\` together. The logo and text are vertically centered with an 8px gap; logo-only and text-only headers have no extra gap. Header logos are 14px tall with width capped at 160px; \`logo.size\` applies to title placements. \`header.showDate\` adds the date on the right. Do not imitate a running header with a Markdown image or spaces.
 - **Business report** — \`corporate\`, \`toc\`, \`headingNumbers\`, \`cover.enabled\`, \`header.text: "{title}"\`, \`footer.text: "Confidential"\`, \`pageBreaks: "h1"\`. Start with an *Executive summary* and a KPI table.
 - **Proposal / statement of work** — \`editorial\`, cover off, header \`"Proposal — {title}"\`; sections Overview → Objectives → Scope (phases as \`###\`) → Timeline (mermaid \`gantt\`) → Investment table → Acceptance table with signature rows.
 - **README / technical doc** — \`clean\`, \`toc\`; titled code blocks, an options table (\`Option | Type | Default | Description\`), \`> [!WARNING]\` for gotchas.

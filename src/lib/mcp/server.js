@@ -152,6 +152,7 @@ function designOptions() {
     backgrounds: map(BACKGROUNDS, (b) => b.name),
     pageBreaks: map(PAGE_BREAK_MODES, (p) => p.name),
     logoPositions: map(LOGO_POSITIONS, (l) => l.name),
+    runningHeader: { logoPosition: 'page-header', logoHeightPx: 14, logoMaxWidthPx: 160, logoTextGapPx: 8, alignment: 'vertically centered', condition: 'Set logo.dataUrl and logo.position="page-header" for a header logo; add header.text for accompanying text. Either may be used alone; the gap is added only when both are present. Set logo.aspect to image width / height.' },
     logoSizes: map(LOGO_SIZES, (l) => ({ name: l.name, heightPx: l.px })),
     placeholders: { '{title}': 'Replaced with the document title in header.text / footer.text' },
     pageBreakDirective: '\\pagebreak on its own line (or <!-- pagebreak -->)',

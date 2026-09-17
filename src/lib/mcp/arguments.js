@@ -75,7 +75,7 @@ export const FIELD_HELP = {
   toc: `Insert a generated table of contents from ## / ### (after the title, or on its own page when a cover is on). Default ${DEFAULT_SETTINGS.toc}. Do not write a TOC by hand.`,
   headingNumbers: `Auto-number H1–H3 as 1 / 1.1 / 1.1.1. Default ${DEFAULT_SETTINGS.headingNumbers}. Do not number headings by hand.`,
   justify: `Justify body paragraphs. Default ${DEFAULT_SETTINGS.justify}.`,
-  headerText: 'Running header (max 200 chars). "{title}" is replaced with the document title. Keep short; no emoji.',
+  headerText: 'Running header (max 200 chars). "{title}" is replaced with the document title. Keep short; no emoji. To pair text with a logo on every page, also set logo.position="page-header" and logo.aspect to the image width / height. Logo and text are vertically centered with an 8px gap only when both are present; either may be used alone.',
   headerShowDate: `Show today's date on the right of the header. Default ${DEFAULT_SETTINGS.header.showDate}.`,
   footerText: 'Running footer (max 200 chars). Supports "{title}". Keep short; no emoji.',
   footerPageNumbers: `Show page numbers. Default ${DEFAULT_SETTINGS.footer.pageNumbers}.`,
