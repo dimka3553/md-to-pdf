@@ -288,8 +288,20 @@ export function buildStyles(design, settings, mode) {
     figure img { display: inline-block; max-width: 100%; max-height: ${Math.round(design.pageHeight * 0.55)}px; border-radius: 6px; }
     figcaption { margin-top: .55em; font-size: .85em; color: ${t.muted}; font-style: italic; }
     figure.diagram { break-inside: avoid; }
-    figure.diagram .mermaid { background: transparent; text-align: center; font-family: inherit; }
-    figure.diagram .mermaid svg { max-width: 100%; height: auto; }
+    figure.diagram .mermaid {
+      background: transparent; text-align: center; font-family: inherit;
+      /* Body kerning / hyphenation change glyph widths after Mermaid measures labels. */
+      font-feature-settings: normal; text-rendering: auto; hyphens: none;
+      overflow: visible;
+    }
+    /* Mermaid sizes foreignObject labels as content-box. The document-wide
+       border-box rule would eat label padding and clip the last characters. */
+    figure.diagram .mermaid,
+    figure.diagram .mermaid *,
+    figure.diagram .mermaid *::before,
+    figure.diagram .mermaid *::after { box-sizing: content-box; }
+    figure.diagram .mermaid svg { max-width: 100%; height: auto; overflow: visible; }
+    figure.diagram .mermaid :is(.nodeLabel, .edgeLabel, .label, .labelBkg, foreignObject) { overflow: visible; }
     .missing-asset { display: inline-block; padding: .3em .6em; border: 1px dashed ${t.muted}; border-radius: 4px; color: ${t.muted}; font-size: .85em; }
 
     /* ---------- Footnotes ---------- */

@@ -121,10 +121,21 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
       return new Promise(function (res) { img.addEventListener('load', res); img.addEventListener('error', res); });
     }));
   }
+  function whenFonts() {
+    if (!document.fonts || !document.fonts.ready) return Promise.resolve();
+    return document.fonts.ready;
+  }
   function whenMermaid() {
     if (!window.mermaid) return Promise.resolve();
     try {
-      window.mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'neutral', fontFamily: getComputedStyle(document.body).fontFamily });
+      var family = getComputedStyle(document.body).fontFamily;
+      window.mermaid.initialize({
+        startOnLoad: false,
+        theme: dark ? 'dark' : 'neutral',
+        fontFamily: family,
+        themeVariables: { fontFamily: family },
+        flowchart: { htmlLabels: true, padding: 12 },
+      });
       return window.mermaid.run({ querySelector: '.mermaid' }).catch(function () {});
     } catch (e) { return Promise.resolve(); }
   }
@@ -245,8 +256,8 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
       window.parent.postMessage({ type: 'md2pdf:preview-ready', pages: pages }, '*');
     }
   }
-  var ready = (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve());
-  Promise.all([ready, whenImages(), whenMermaid()]).then(done, done);
+  // Fonts must settle before Mermaid measures labels, otherwise fallback metrics clip the text.
+  Promise.all([whenFonts(), whenImages()]).then(whenMermaid, whenMermaid).then(done, done);
   if (preview) {
     window.addEventListener('resize', onResize);
     var scrollTimer = null;
