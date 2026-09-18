@@ -154,6 +154,73 @@ test('heading stranded at the bottom of a page is a warning', () => {
   assert.ok(issues.some((i) => i.code === 'heading-at-bottom'));
 });
 
+test('a footnotes-only last page is not flagged as blank', () => {
+  const pages = [
+    {
+      number: 1,
+      usedPct: 90,
+      header: '',
+      footer: '1 / 2',
+      body: [{ text: 'See the note.', yPct: 20 }],
+      blocks: [{ kind: 'p', text: 'See the note.', yPct: 20, flags: {}, look: {} }],
+    },
+    {
+      number: 2,
+      usedPct: 16,
+      header: '',
+      footer: '2 / 2',
+      body: [{ text: 'Footnotes', yPct: 12 }, { text: '1. Source url', yPct: 18 }],
+      blocks: [],
+    },
+  ];
+  const issues = detectLayoutIssues(pages, { title: 'Doc', settings: normalizeSettings({}) });
+  assert.ok(!issues.some((i) => i.code === 'blank-page'), 'footnotes page should not be blank');
+  assert.equal(pages[1].role, 'footnotes');
+});
+
+test('footnote blocks are assigned to the last page and labelled NOTES', () => {
+  const printed = printedPages([
+    { body: [{ text: 'See the note.', yPct: 20 }] },
+    { body: [{ text: 'Footnotes', yPct: 12 }, { text: '1. Source url', yPct: 18 }] },
+  ]);
+  const dom = {
+    blocks: [
+      { kind: 'p', text: 'See the note.', look: {}, flags: {} },
+      { kind: 'footnotes', text: 'Footnotes 1. Source url', footnotes: { entries: 1, preview: ['Source url'] }, look: {}, flags: {} },
+    ],
+    overflow: [],
+    look: {},
+  };
+  const pages = assignBlocksToPages(dom, printed);
+  assert.equal(pages[1].role, 'footnotes');
+  assert.equal(pages[1].blocks[0].kind, 'footnotes');
+  const settings = normalizeSettings({});
+  const report = buildLayoutReport({ printed, dom, settings, design: resolveDesign(settings), title: 'Doc' });
+  assert.ok(!report.issues.some((i) => i.code === 'blank-page'));
+  assert.match(report.text, /footnotes|NOTES/i);
+});
+
+test('unlocated figures stay in document order instead of sorting last', () => {
+  const printed = printedPages([
+    { body: [
+      { text: 'Intro paragraph', yPct: 10 },
+      { text: 'Bullet one', yPct: 42 },
+      { text: 'Bullet two', yPct: 50 },
+    ] },
+  ]);
+  const pages = assignBlocksToPages({
+    blocks: [
+      { kind: 'p', text: 'Intro paragraph', look: {}, flags: {} },
+      { kind: 'figure', text: '', caption: 'Figure 1 — map of the site', look: {}, flags: {}, image: { alt: 'map', width: 240, height: 80 } },
+      { kind: 'ul', text: 'Bullet one Bullet two', look: {}, flags: {}, list: { items: 2, preview: ['Bullet one'] } },
+    ],
+    overflow: [],
+  }, printed);
+  assert.equal(pages[0].blocks.map((b) => b.kind).join(), 'p,figure,ul');
+  assert.ok(pages[0].blocks[1].yPct != null);
+  assert.ok(pages[0].blocks[1].yPct < pages[0].blocks[2].yPct);
+});
+
 test('real Chromium render_pdf includes a layout report with page map', { timeout: 120_000 }, async () => {
   const table = '| Item | Monthly amount |\n| --- | --- |\n'
     + Array.from({ length: 4 }, (_, i) => `| Row ${i + 1} | ${1500 + i * 10} USD |`).join('\n');

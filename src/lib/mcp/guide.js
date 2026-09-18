@@ -8,7 +8,7 @@
 
 import { ARGUMENT_CATALOG } from './arguments.js';
 
-export const GUIDE_VERSION = '1.7.0';
+export const GUIDE_VERSION = '1.8.0';
 
 export const MARKDOWN_GUIDE = `# Writing Markdown for Markdown Studio
 
@@ -19,12 +19,12 @@ front-matter, custom CSS) does **not**.
 ## Workflow
 
 1. Read this guide once (you are doing that now).
-2. Pick a starting point: \`list_templates\` → \`get_template\` gives you proven structure **and** matching design settings for reports, proposals, READMEs, meeting notes, invoices and résumés. If the source is a web page, call \`import_web_page\` with the URL instead — it returns clean Markdown, metadata and an analysis; never retype page content from memory.
+2. Pick a starting point: \`list_templates\` (pass \`id\` to fetch Markdown) gives you proven structure **and** matching design settings. \`get_template\` is an alias. If the source is a web page, call \`import_web_page\` with the URL instead — it returns clean Markdown, metadata, an analysis and a \`documentId\`; never retype page content from memory.
 3. Write the Markdown. One \`#\` title, \`##\` sections, short paragraphs, generous use of tables, callouts and code blocks.
-4. Run \`analyze_markdown\` — it returns the outline plus warnings (skipped heading levels, code fences without a language, YAML front-matter, missing images, ragged tables…). Fix everything it reports.
-5. **Ask for styles every time** — list theme, paper, fonts, TOC, cover, header/footer and the other knobs (full list at the end of this guide) and wait for an answer before \`render_pdf\`. Recommend a starting set. Default chrome is **no running header**: do not put the title (or \`{title}\`) at the top of every page; the H1 already prints once. See *Before rendering*.
-6. Render with \`render_pdf\` (or \`render_html\` for a quick look). Pass \`markdown\`, \`settings\`, optional \`assets\` and \`fileName\`.
-7. **Read the LAYOUT REPORT** in the \`render_pdf\` result. It lists every page, the y-position of each block (percent from the top), how it looks (heading/table/callout, colours, sizes), where page breaks happened and why, plus warnings (stranded headings, sparse pages, clipped tables). Use that to fix pagination — do **not** screenshot the PDF or open it in a browser to find breaks.
+4. Run \`analyze_markdown\` — it returns a \`documentId\`, the outline and warnings. Fix everything it reports. Reuse that id on later calls instead of resending the Markdown.
+5. Recommend a look from the recipes (empty running header). Wait only when a person is choosing; on an unattended run, apply the recipe and render. Never put the title (or \`{title}\`) at the top of every page; the H1 already prints once. See *Relaying options to the user*.
+6. Render with \`render_pdf\` (or \`render_html\` for a quick look). Pass \`documentId\` + \`settings\`, or \`markdown\` the first time. \`render_html\` returns a 24-hour URL like the PDF; pass \`inline: true\` only if you need the HTML in context.
+7. **Read the LAYOUT REPORT** in the \`render_pdf\` result. It lists every page, the y-position of each block (percent from the top), how it looks (heading/table/callout, colours, sizes), where page breaks happened and why, plus warnings (stranded headings, sparse pages, clipped tables). Use that to fix pagination — do **not** screenshot the PDF or open it in a browser to find breaks. Re-render with the same \`documentId\` and a settings patch.
 8. **Give the user the download URL** from the \`render_pdf\` text result (\`https://<host>/d/<id>.pdf\`, valid 24 hours). Do not expect a base64 PDF attachment. See *After rendering* at the end of this guide.
 
 ## Document structure
@@ -206,7 +206,7 @@ Pass a \`settings\` object to \`render_pdf\` / \`render_html\`. Every key is opt
   "toc": true,
   "headingNumbers": true,
   "justify": false,
-  "header": { "text": "", "showDate": false },
+  "header": { "text": "", "showDate": false, "logo": null },
   "footer": { "text": "Confidential", "pageNumbers": true, "pageNumberStyle": "n-of-total" },
   "cover": { "enabled": true, "title": "", "subtitle": "Quarterly review", "author": "Strategy team", "date": "Q3 2026", "showLogo": true },
   "logo": { "dataUrl": "data:image/png;base64,…", "position": "title-right", "size": "md" }
@@ -228,7 +228,7 @@ Every nested field, enum, default and tool argument is listed at the end of this
 
 ## Recipes
 
-- **Branded running header** — only if the user asked for one, and never the document title. Set \`logo.position: "page-header"\`, \`logo.dataUrl\`, \`logo.aspect\` (image width / height), and a short \`header.text\` that is **not** the H1. The logo and text are vertically centered with an 8px gap; logo-only and text-only headers have no extra gap. Header logos are 14px tall with width capped at 160px; \`logo.size\` applies to title placements. \`header.showDate\` adds the date on the right. Do not imitate a running header with a Markdown image or spaces.
+- **Branded running header** — only if the user asked for one, and never the document title. Set \`header.logo\` (\`dataUrl\` + \`aspect\`) independently of \`logo.position\`, so a cover/title logo can coexist, plus a short \`header.text\` that is **not** the H1. The logo and text are vertically centered with an 8px gap; logo-only and text-only headers have no extra gap. Header logos are 14px tall with width capped at 160px; \`logo.size\` applies to title placements. \`logo.position: "page-header"\` remains a legacy shortcut that hides the title logo. \`header.showDate\` adds the date on the right. Do not imitate a running header with a Markdown image or spaces.
 - **Business report** — \`corporate\`, \`toc\`, \`headingNumbers\`, \`cover.enabled\`, **no running header**, \`footer.text: "Confidential"\` only if they want it, \`pageBreaks: "h1"\`. Start with an *Executive summary* and a KPI table.
 - **Proposal / statement of work** — \`editorial\`, cover off, **no running header**; sections Overview → Objectives → Scope (phases as \`###\`) → Timeline (mermaid \`gantt\`) → Investment table → Acceptance table with signature rows.
 - **README / technical doc** — \`clean\`, \`toc\`; titled code blocks, an options table (\`Option | Type | Default | Description\`), \`> [!WARNING]\` for gotchas.

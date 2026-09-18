@@ -197,7 +197,7 @@ export default function DesignPanel({ settings, onChange, onLogoFile, onClose })
                 <div className="mt-1 flex gap-1">
                   <button type="button" onClick={() => logoInput.current?.click()} className="text-xs font-medium text-brand-600 hover:underline">Replace</button>
                   <span className="text-gray-300">·</span>
-                  <button type="button" onClick={() => set({ logo: null })} className="text-xs font-medium text-red-600 hover:underline">Remove</button>
+                  <button type="button" onClick={() => set({ logo: null, header: { ...settings.header, logo: null } })} className="text-xs font-medium text-red-600 hover:underline">Remove</button>
                 </div>
               </div>
             </div>
@@ -233,6 +233,18 @@ export default function DesignPanel({ settings, onChange, onLogoFile, onClose })
             <Input value={settings.header.text} onChange={(e) => setNested('header', { text: e.target.value })} placeholder="e.g. Acme Corp — {title}" />
           </Field>
           <Toggle label="Show date in header" checked={settings.header.showDate} onChange={(v) => setNested('header', { showDate: v })} />
+          {settings.logo && settings.logo.position !== 'page-header' && (
+            <Toggle
+              label="Also show logo in running header"
+              description="Independent of title/cover placement — both can be on."
+              checked={!!settings.header.logo}
+              onChange={(v) => setNested('header', {
+                logo: v
+                  ? { dataUrl: settings.logo.dataUrl, name: settings.logo.name, aspect: settings.logo.aspect }
+                  : null,
+              })}
+            />
+          )}
           <Field label="Footer text">
             <Input value={settings.footer.text} onChange={(e) => setNested('footer', { text: e.target.value })} placeholder="e.g. Confidential" />
           </Field>

@@ -1,6 +1,7 @@
 /**
- * Short-lived PDF downloads. Local `next dev` writes to disk; Vercel uses a
- * private Blob store. The public URL is always `/d/<id>.pdf` on this origin.
+ * Short-lived public downloads (PDF and HTML). Local `next dev` writes to
+ * disk; Vercel uses a private Blob store. The public URL is `/d/<id>.pdf`
+ * or `/d/<id>.html` on this origin.
  */
 
 import { createHash, randomBytes } from 'node:crypto';
@@ -16,12 +17,16 @@ const BLOB_PREFIX = 'downloads';
 const MAX_LOCAL_FILES = 80;
 
 export function parseDownloadId(raw) {
-  const id = String(raw || '').replace(/\.pdf$/i, '');
+  const id = String(raw || '').replace(/\.(pdf|html)$/i, '');
   return DOWNLOAD_ID_RE.test(id) ? id : null;
 }
 
-export function downloadUrl(origin, id) {
-  return `${String(origin).replace(/\/$/, '')}/d/${id}.pdf`;
+export function extensionForMime(mimeType) {
+  return mimeType === 'text/html' ? 'html' : 'pdf';
+}
+
+export function downloadUrl(origin, id, mimeType = 'application/pdf') {
+  return `${String(origin).replace(/\/$/, '')}/d/${id}.${extensionForMime(mimeType)}`;
 }
 
 export function contentDisposition(fileName, disposition = 'inline') {
@@ -31,15 +36,15 @@ export function contentDisposition(fileName, disposition = 'inline') {
   return `${disposition}; filename="${ascii || 'document.pdf'}"; filename*=UTF-8''${encodeURIComponent(fileName || 'document.pdf')}`;
 }
 
-function blobStoreEnabled() {
+export function blobStoreEnabled() {
   return Boolean(process.env.VERCEL) && Boolean(process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN);
 }
 
-function blobConfigured() {
+export function blobConfigured() {
   return Boolean(process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN);
 }
 
-function localDir() {
+export function localDir() {
   return process.env.DOWNLOAD_DIR || join(tmpdir(), 'markdown-studio-downloads');
 }
 
@@ -52,26 +57,27 @@ function ttlSeconds(ttlMs) {
 }
 
 /**
- * Store a rendered PDF and return a public download URL.
+ * Store a rendered file and return a public download URL.
  * @param {{ body: Buffer, fileName: string, origin: string, mimeType?: string, ttlMs?: number }} input
  */
 export async function persistDownload({ body, fileName, origin, mimeType = 'application/pdf', ttlMs = DOWNLOAD_TTL_MS }) {
-  if (!Buffer.isBuffer(body) && !(body instanceof Uint8Array)) throw new Error('PDF body is missing.');
+  if (!Buffer.isBuffer(body) && !(body instanceof Uint8Array)) throw new Error('File body is missing.');
   const bytes = body.length;
-  if (!bytes) throw new Error('PDF body is empty.');
+  if (!bytes) throw new Error('File body is empty.');
 
   if (process.env.VERCEL && !blobConfigured()) {
-    throw new Error('PDF download storage is not configured. Connect a private Vercel Blob store to this project.');
+    throw new Error('Download storage is not configured. Connect a private Vercel Blob store to this project.');
   }
 
   const id = randomBytes(16).toString('hex');
   const expiresAt = Date.now() + ttlMs;
-  const meta = { fileName, mimeType, expiresAt, bytes, etag: createHash('sha256').update(body).digest('hex').slice(0, 32) };
+  const ext = extensionForMime(mimeType);
+  const meta = { fileName, mimeType, ext, expiresAt, bytes, etag: createHash('sha256').update(body).digest('hex').slice(0, 32) };
 
   if (blobStoreEnabled()) await putBlob(id, body, meta, ttlMs);
   else await putLocal(id, body, meta);
 
-  return { id, url: downloadUrl(origin, id), expiresAt, fileName, bytes, mimeType };
+  return { id, url: downloadUrl(origin, id, mimeType), expiresAt, fileName, bytes, mimeType };
 }
 
 /**
@@ -95,12 +101,13 @@ export async function removeDownload(id) {
   const parsed = parseDownloadId(id);
   if (!parsed) return;
   if (blobStoreEnabled()) {
-    await del([`${BLOB_PREFIX}/${parsed}.pdf`, `${BLOB_PREFIX}/${parsed}.json`]).catch(() => {});
+    await del([`${BLOB_PREFIX}/${parsed}.pdf`, `${BLOB_PREFIX}/${parsed}.html`, `${BLOB_PREFIX}/${parsed}.json`]).catch(() => {});
     return;
   }
   const dir = localDir();
   await Promise.all([
     rm(join(dir, `${parsed}.pdf`), { force: true }),
+    rm(join(dir, `${parsed}.html`), { force: true }),
     rm(join(dir, `${parsed}.json`), { force: true }),
   ]);
 }
@@ -109,8 +116,9 @@ async function putBlob(id, body, meta, ttlMs) {
   const cacheControlMaxAge = ttlSeconds(ttlMs);
   const opts = { ...blobOptions(), addRandomSuffix: false, allowOverwrite: false, cacheControlMaxAge };
   await put(`${BLOB_PREFIX}/${id}.json`, JSON.stringify(meta), { ...opts, contentType: 'application/json' });
+  const ext = meta.ext || extensionForMime(meta.mimeType);
   try {
-    await put(`${BLOB_PREFIX}/${id}.pdf`, body, { ...opts, contentType: meta.mimeType });
+    await put(`${BLOB_PREFIX}/${id}.${ext}`, body, { ...opts, contentType: meta.mimeType });
   } catch (err) {
     await del(`${BLOB_PREFIX}/${id}.json`).catch(() => {});
     throw err;
@@ -121,17 +129,19 @@ async function readBlob(id) {
   const metaResult = await get(`${BLOB_PREFIX}/${id}.json`, blobOptions());
   if (!metaResult || metaResult.statusCode !== 200 || !metaResult.stream) return null;
   const meta = JSON.parse(Buffer.from(await new Response(metaResult.stream).arrayBuffer()).toString('utf8'));
-  const pdfResult = await get(`${BLOB_PREFIX}/${id}.pdf`, blobOptions());
-  if (!pdfResult || pdfResult.statusCode !== 200 || !pdfResult.stream) return null;
-  return { ...meta, body: pdfResult.stream };
+  const ext = meta.ext || extensionForMime(meta.mimeType);
+  const fileResult = await get(`${BLOB_PREFIX}/${id}.${ext}`, blobOptions());
+  if (!fileResult || fileResult.statusCode !== 200 || !fileResult.stream) return null;
+  return { ...meta, body: fileResult.stream };
 }
 
 async function putLocal(id, body, meta) {
   const dir = localDir();
   await mkdir(dir, { recursive: true });
   await pruneLocal(dir).catch(() => {});
+  const ext = meta.ext || extensionForMime(meta.mimeType);
   await writeFile(join(dir, `${id}.json`), JSON.stringify(meta));
-  await writeFile(join(dir, `${id}.pdf`), body);
+  await writeFile(join(dir, `${id}.${ext}`), body);
 }
 
 async function readLocal(id) {
@@ -143,9 +153,10 @@ async function readLocal(id) {
     return null;
   }
   const meta = JSON.parse(raw);
+  const ext = meta.ext || extensionForMime(meta.mimeType);
   let body;
   try {
-    body = await readFile(join(dir, `${id}.pdf`));
+    body = await readFile(join(dir, `${id}.${ext}`));
   } catch {
     return null;
   }

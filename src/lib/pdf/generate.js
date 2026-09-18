@@ -1,4 +1,5 @@
 import { buildDocumentHtml, buildPdfPageOptions } from '../document/html.js';
+import { withPrintableFonts } from '../document/fonts.js';
 import { resolveDesign } from '../document/settings.js';
 import { withBrowser } from './browser.js';
 import { collectDomSnapshot } from './inspect.js';
@@ -15,7 +16,7 @@ const PDF_TIMEOUT_MS = 25_000;
  * @returns {Promise<{ pdf: Buffer, title: string, layout?: object }>}
  */
 export async function renderPdf({ markdown, settings, assets, title, includeLayout = false }) {
-  const html = buildDocumentHtml({ markdown, settings, assets, mode: 'pdf', title });
+  const html = await withPrintableFonts(buildDocumentHtml({ markdown, settings, assets, mode: 'pdf', title }));
   const pageOptions = buildPdfPageOptions(settings, markdown, title);
   const design = resolveDesign(settings);
 

@@ -48,10 +48,11 @@ export const THEME_IDS = keys(THEMES);
 export const TEMPLATE_IDS = TEMPLATES.map((t) => t.id);
 
 export const FIELD_HELP = {
-  markdown: `The full GitHub-flavoured Markdown source (max ${MAX_MARKDOWN_BYTES / (1024 * 1024)} MB). Always pass the entire document — tools are stateless.`,
+  markdown: `The full GitHub-flavoured Markdown source (max ${MAX_MARKDOWN_BYTES / (1024 * 1024)} MB). Required unless you pass \`documentId\`. Prefer \`documentId\` on re-renders so you do not resend the document.`,
+  documentId: '32-hex id returned by analyze_markdown, import_web_page, render_pdf or render_html. Reuse it with a settings patch instead of resending markdown and assets. Expires in 24 hours.',
   fileName: 'Preferred output file name without extension (max 120 chars). Defaults to the first H1 / inferred title. Do not include .pdf or .html.',
-  assets: `Embedded images as a map of name → data URL (\`data:image/png;base64,…\`, JPEG, SVG, WebP, GIF). Reference in Markdown as \`![alt](asset:name)\`. Max ${MAX_ASSETS} images, ${MAX_ASSET_BYTES / (1024 * 1024)} MB each, ${MAX_TOTAL_ASSET_BYTES / (1024 * 1024)} MB total. Remote HTTPS images can be used in Markdown without this map.`,
-  settings: 'Document design settings. Every key is optional and merged over the defaults. You MUST list these options to the user and wait for their answer before calling render_pdf. Default chrome: no running header (do not put the title on every page).',
+  assets: `Embedded images as a map of name → data URL (\`data:image/png;base64,…\`, JPEG, SVG, WebP, GIF). Reference in Markdown as \`![alt](asset:name)\`. Max ${MAX_ASSETS} images, ${MAX_ASSET_BYTES / (1024 * 1024)} MB each, ${MAX_TOTAL_ASSET_BYTES / (1024 * 1024)} MB total. Remote HTTPS images can be used in Markdown without this map. Omitted when \`documentId\` is set — stored assets are reused.`,
+  settings: 'Document design settings. Every key is optional and merged over the defaults (and over the settings stored with documentId). Default chrome: no running header; do not put the title on every page.',
   theme: `Colour and typography theme. One of ${quoted(THEME_IDS)}. Default "${DEFAULT_SETTINGS.theme}".`,
   font: `Body font. "inherit" uses the theme default. Otherwise one of ${quoted(FONT_IDS)}. Default "${DEFAULT_SETTINGS.font}".`,
   headingFont: `Heading font. "inherit" uses the theme default. Otherwise one of ${quoted(FONT_IDS)}. Default "${DEFAULT_SETTINGS.headingFont}".`,
@@ -75,8 +76,9 @@ export const FIELD_HELP = {
   toc: `Insert a generated table of contents from ## / ### (after the title, or on its own page when a cover is on). Default ${DEFAULT_SETTINGS.toc}. Do not write a TOC by hand.`,
   headingNumbers: `Auto-number H1–H3 as 1 / 1.1 / 1.1.1. Default ${DEFAULT_SETTINGS.headingNumbers}. Do not number headings by hand.`,
   justify: `Justify body paragraphs. Default ${DEFAULT_SETTINGS.justify}.`,
-  headerText: 'Running header (max 200 chars). Leave empty by default — the `#` heading already prints the title once. Do not set this to the document title or "{title}"; repeating it on every page looks like a duplicate masthead. Only set a short brand line when the user explicitly asks for a header that is not the title. No emoji. To pair text with a logo on every page, also set logo.position="page-header" and logo.aspect to the image width / height.',
+  headerText: 'Running header (max 200 chars). Leave empty by default — the `#` heading already prints the title once. Do not set this to the document title or "{title}"; repeating it on every page looks like a duplicate masthead. Only set a short brand line when the user explicitly asks for a header that is not the title. No emoji. To pair text with a logo on every page, set header.logo (independent of logo.position).',
   headerShowDate: `Show today's date on the right of the header. Default ${DEFAULT_SETTINGS.header.showDate}.`,
+  headerLogo: 'Logo for the running header, independent of logo.position so a cover/title logo and a header logo can both be on. Same shape as logo (dataUrl required) without position/size — printed height is 14px. Set to null to remove. logo.position="page-header" still works as a legacy shortcut.',
   footerText: 'Running footer (max 200 chars). Supports "{title}". Keep short; no emoji.',
   footerPageNumbers: `Show page numbers. Default ${DEFAULT_SETTINGS.footer.pageNumbers}.`,
   footerPageNumberStyle: `"n-of-total" → "3 / 12", "n" → "3". Default "${DEFAULT_SETTINGS.footer.pageNumberStyle}".`,
@@ -88,33 +90,33 @@ export const FIELD_HELP = {
   coverShowLogo: `Draw the logo on the cover when a logo is set. Default ${DEFAULT_SETTINGS.cover.showLogo}.`,
   logoDataUrl: 'PNG/JPEG/SVG/WebP/GIF as a data URL starting with "data:image/". Required if logo is set.',
   logoName: 'Optional logo file name (max 200).',
-  logoPosition: `Placement: ${Object.entries(LOGO_POSITIONS)
+  logoPosition: `Placement of the document logo (cover / title / watermark): ${Object.entries(LOGO_POSITIONS)
     .map(([k, v]) => `"${k}" (${v.name})`)
-    .join(', ')}. Default "title-right".`,
+    .join(', ')}. Default "title-right". "page-header" is a legacy shortcut; prefer header.logo so a title/cover logo can coexist.`,
   logoSize: `Height: ${Object.entries(LOGO_SIZES)
     .map(([k, v]) => `"${k}" (${v.name}, ${v.px}px)`)
-    .join(', ')}. Default "md".`,
-  logoAspect: 'width / height of the image, used when the logo is drawn in the page header. Optional; default 1.',
+    .join(', ')}. Default "md". Applies to title/cover placements, not the running header.`,
+  logoAspect: 'width / height of the image. Used for the running header (header.logo or logo.position="page-header"). Optional; default 1.',
   templateId: `Template id: ${quoted(TEMPLATE_IDS)}.`,
   url: 'Public http(s) URL of the page to import (max 2048 chars). "https://" is assumed when the scheme is missing. localhost and private-network hosts are rejected.',
   importFormat: '"markdown" (default) converts the main content to GitHub-flavoured Markdown and runs analyze_markdown on it; "html" returns the cleaned HTML fragment instead.',
   stripImages: 'Remove every image from the result. Default false. Use when the page is image-heavy or the images are decorative.',
   stripLinks: 'Replace hyperlinks with their text (images are kept). Default false. Handy for print where links are not clickable anyway.',
+  inlineHtml: 'If true, also embed the HTML in the tool result (often 30 KB+ of CSS/JS). Default false — a 24-hour https download URL is always returned, like render_pdf.',
 };
 
 /**
- * Gate before every render: list style options and wait. Shared by server
- * instructions, the authoring guide, the render_pdf description and the skill.
+ * How strictly agents must pause for a human style choice.
+ * MARKDOWN_STUDIO_ASK_STYLES=always|interactive|never (default interactive).
  */
-export const ASK_STYLES_INSTRUCTIONS = `## Before rendering: ask for styles every time
+export function askStylesMode() {
+  const raw = String(process.env.MARKDOWN_STUDIO_ASK_STYLES || 'interactive').trim().toLowerCase();
+  if (['always', '1', 'true', 'yes', 'on'].includes(raw)) return 'always';
+  if (['never', '0', 'false', 'no', 'off'].includes(raw)) return 'never';
+  return 'interactive';
+}
 
-Do **not** call \`render_pdf\` until you have listed the design options below in plain language and the user has replied. This is required on every request — first render, re-render, "just make a PDF", "looks good, export it", prompts, and follow-ups. Showing options in the server instructions or this guide does not count; the person in the chat has to see them and answer.
-
-1. **List the knobs** (names, not raw JSON): theme, accent, fonts, size, background, paper, orientation, margins, TOC, numbered headings, cover, page breaks, running header/footer, page numbers, logo, file name.
-2. **Recommend a starting set** for this document type (see recipes). Default chrome is **minimal**: empty running header, no date in the header, footer page numbers only.
-3. **Wait.** If they pick, use their picks. If they say "you decide" *after seeing the options*, apply the recommendation. Do not skip the ask.
-
-### Keep the top of the page empty
+const KEEP_HEADER_EMPTY = `### Keep the top of the page empty
 
 The \`#\` title already appears once as the document heading. Do **not** also put it in \`header.text\` (including \`{title}\`, the file name, or a paraphrase of the H1). That prints a second title on every page.
 
@@ -125,7 +127,38 @@ Default unless the user explicitly asks otherwise:
 - \`footer.pageNumbers\`: \`true\`
 - \`footer.text\`: \`""\` (add a short line only if they want "Confidential" or a company name)
 
-A running header is for a **brand line or logo that is not the document title**, and only when they asked for one.`;
+A running header is for a **brand line or logo that is not the document title**, and only when they asked for one. Use \`header.logo\` (not \`logo.position: "page-header"\`) when a cover/title logo should also appear in the header.`;
+
+function buildAskStylesInstructions(mode) {
+  if (mode === 'never') {
+    return `## Relaying options to the user
+
+This server is set to \`MARKDOWN_STUDIO_ASK_STYLES=never\`. Apply a recipe and render without waiting. Keep chrome minimal: empty running header, footer page numbers only, never put the H1 in \`header.text\`.
+
+${KEEP_HEADER_EMPTY}`;
+  }
+  if (mode === 'always') {
+    return `## Before rendering: ask for styles
+
+Do **not** call \`render_pdf\` until you have listed the design options below in plain language and the user has replied. This is required on every request, including re-renders.
+
+1. **List the knobs** (names, not raw JSON): theme, accent, fonts, size, background, paper, orientation, margins, TOC, numbered headings, cover, page breaks, running header/footer, page numbers, logo, file name.
+2. **Recommend a starting set** for this document type (see recipes). Default chrome is **minimal**: empty running header, no date in the header, footer page numbers only.
+3. **Wait.** If they pick, use their picks. If they say "you decide" after seeing the options, apply the recommendation.
+
+${KEEP_HEADER_EMPTY}`;
+  }
+  return `## Relaying options to the user
+
+When a **person is choosing a look**, list the knobs below in plain language, recommend a starting set, and wait. **Do not stall** on agentic or unattended runs — they already asked you to render, said you may decide, supplied settings, or requested a full pipeline. Default chrome is **minimal**: empty running header, no date in the header, footer page numbers only.
+
+Operators: \`MARKDOWN_STUDIO_ASK_STYLES=always\` restores the old pause-every-time behaviour; \`never\` skips the ask entirely. Default is \`interactive\`.
+
+${KEEP_HEADER_EMPTY}`;
+}
+
+export const ASK_STYLES_MODE = askStylesMode();
+export const ASK_STYLES_INSTRUCTIONS = buildAskStylesInstructions(ASK_STYLES_MODE);
 
 /**
  * What the agent must do the moment `render_pdf` returns. Shared by the server
@@ -145,7 +178,7 @@ The moment the tool returns, show that URL to the user — automatically, withou
 3. Confirm the file name, theme, paper and that the link expires in 24 hours. When the user asks for changes, re-render and replace the previous link (and the same canvas, in Cursor).
 4. **Judge layout from the LAYOUT REPORT** in the same tool result (pages, y% of every block, appearance, break reasons, warnings). Do not screenshot the PDF, rasterise it, or open it in a browser to find page breaks. Only peek visually if a logo, diagram or colour is still unclear after reading the report.
 
-If you need a quick look at styling without a PDF, call \`render_html\` (\`text/html\` usually passes through). Do not rebuild the PDF in a local browser to work around a missing blob.`;
+If you need a quick look at styling without a PDF, call \`render_html\` — it returns a 24-hour https URL (same as the PDF), not a dump of CSS. Pass \`inline: true\` only if you truly need the HTML in context.`;
 
 /** Human-readable catalog for server instructions, get_markdown_guide, and the skill. */
 export function buildArgumentCatalog() {
@@ -209,45 +242,44 @@ When listing options, in plain language offer:
 - **Chrome** — default is none at the top (no running header, no repeated title). Optional: a short brand line that is **not** the H1, date in the header, footer text, page numbers ("3 / 12" or "3"), logo
 - **File name** — optional; otherwise taken from the H1
 
-Recommend a starting set from the recipes (report → corporate + TOC + cover + **no running header**, README → clean + TOC, invoice → mono, and so on). Then wait.
+Recommend a starting set from the recipes (report → corporate + TOC + cover + **no running header**, README → clean + TOC, invoice → mono, and so on). Wait only when a person is choosing; see *Relaying options to the user*.
 
 ${OPEN_PDF_INSTRUCTIONS}
 
 ## Tool arguments
 
-All tools are stateless. Pass the full Markdown every time.
+Pass \`markdown\` once, then reuse the returned \`documentId\` with a settings patch. Assets travel with the snapshot.
 
 ### \`get_markdown_guide\`
 
-No arguments. Returns this guide (syntax + every setting).
+No arguments. Returns this guide (syntax + every setting). Call once per session.
 
 ### \`list_design_options\`
 
-No arguments. Returns JSON: defaults, themes (colours and default fonts), fonts, sizes, paper, margins, backgrounds, page-break modes, logo placement, and the \`{title}\` placeholder.
+No arguments. Returns JSON: defaults, themes (colours and default fonts), fonts, sizes, paper, margins, backgrounds, page-break modes, logo placement, template summaries, and the \`{title}\` placeholder. Optional — the same enums are in this guide.
 
 ### \`list_templates\`
 
-No arguments. Returns id, name, description and recommended \`settings\` for each starter.
-
-### \`get_template\`
-
 | Argument | Required | Meaning |
 | --- | --- | --- |
-| \`id\` | yes | ${FIELD_HELP.templateId} |
+| \`id\` | no | ${FIELD_HELP.templateId} Omit to list every starter. Pass an id to fetch that template's Markdown (same as get_template). |
 
 ${templateTable}
 
-Returns the Markdown skeleton and the \`settings\` it was designed with. Use the structure; still ask the user about styles before \`render_pdf\`, and do not copy a running header that repeats the title.
+### \`get_template\`
+
+Alias of \`list_templates\` with \`id\`. Prefer \`list_templates\`.
 
 ### \`analyze_markdown\`
 
 | Argument | Required | Meaning |
 | --- | --- | --- |
-| \`markdown\` | yes | ${FIELD_HELP.markdown} |
-| \`settings\` | no | Same object as render. Currently only \`settings.toc\` changes linting (hand-written TOC vs generated). |
+| \`markdown\` | if no documentId | ${FIELD_HELP.markdown} |
+| \`documentId\` | if no markdown | ${FIELD_HELP.documentId} |
+| \`settings\` | no | Same object as render. Currently only \`settings.toc\` changes linting (hand-written TOC vs generated). Stored with the snapshot for later diffs. |
 | \`assets\` | no | ${FIELD_HELP.assets} |
 
-Fix every \`"warning"\` before rendering. \`"info"\` items are suggestions.
+Returns a \`documentId\` to pass to render_pdf / render_html. Fix every \`"warning"\` before rendering. \`"info"\` items are suggestions.
 
 ### \`import_web_page\`
 
@@ -260,18 +292,20 @@ Renders a public web page in headless Chromium (5–25 s) — waiting for JavaSc
 | \`stripImages\` | no | ${FIELD_HELP.stripImages} |
 | \`stripLinks\` | no | ${FIELD_HELP.stripLinks} |
 
-Use it whenever the user hands you a URL. Then polish the Markdown (fix the reported warnings, delete leftover "share"/"related" fragments, add a source footnote), ask for styles, and pass it to \`render_pdf\`. Without MCP the same import is \`GET /api/scrape?url=…&images=true&links=true\` (or \`/api/scrapehtml\`).
+Use it whenever the user hands you a URL. Then polish the Markdown (fix the reported warnings, delete leftover "share"/"related" fragments, add a source footnote) and pass the returned \`documentId\` to \`render_pdf\`. Without MCP the same import is \`GET /api/scrape?url=…&images=true&links=true\` (or \`/api/scrapehtml\`).
 
 ### \`render_pdf\` / \`render_html\`
 
-Same arguments. \`render_pdf\` uses headless Chromium (3–15 s) and returns a 24-hour download URL in the text (\`https://<host>/d/<id>.pdf\`) plus an MCP \`resource_link\` — not a base64 PDF — **and a LAYOUT REPORT**: page count, every block's kind/text/y% from the top of its page, colours and sizes, where each page break happened and why, plus warnings (stranded headings, sparse pages, overflowing tables). Read the report instead of screenshotting. Do not call \`render_pdf\` until you have listed style options and the user has answered. \`render_html\` is fast and returns standalone HTML with the same CSS (no page map — pagination exists only in the PDF). As soon as \`render_pdf\` returns, give the user that URL (see **After rendering** above).
+Same arguments. \`render_pdf\` uses headless Chromium (3–15 s) and returns a 24-hour download URL in the text (\`https://<host>/d/<id>.pdf\`) plus an MCP \`resource_link\` — not a base64 PDF — **and a LAYOUT REPORT**: page count, every block's kind/text/y% from the top of its page, colours and sizes, where each page break happened and why, plus warnings (stranded headings, sparse pages, overflowing tables). Read the report instead of screenshotting. \`render_html\` is fast (no browser) and also returns a 24-hour https URL (\`/d/<id>.html\`); pass \`inline: true\` only if you need the HTML in the tool result. As soon as \`render_pdf\` returns, give the user that URL (see **After rendering** above).
 
 | Argument | Required | Meaning |
 | --- | --- | --- |
-| \`markdown\` | yes | ${FIELD_HELP.markdown} |
+| \`markdown\` | if no documentId | ${FIELD_HELP.markdown} |
+| \`documentId\` | if no markdown | ${FIELD_HELP.documentId} |
 | \`settings\` | no | ${FIELD_HELP.settings} |
 | \`assets\` | no | ${FIELD_HELP.assets} |
 | \`fileName\` | no | ${FIELD_HELP.fileName} |
+| \`inline\` | no | ${FIELD_HELP.inlineHtml} (\`render_html\` only) |
 
 ### \`settings\` object
 
@@ -293,9 +327,10 @@ ${mdTable(
       ['`toc`', 'boolean', String(DEFAULT_SETTINGS.toc), FIELD_HELP.toc],
       ['`headingNumbers`', 'boolean', String(DEFAULT_SETTINGS.headingNumbers), FIELD_HELP.headingNumbers],
       ['`justify`', 'boolean', String(DEFAULT_SETTINGS.justify), FIELD_HELP.justify],
-      ['`header`', 'object', 'see below', 'Running header. Partial object is fine.'],
+      ['`header`', 'object', 'see below', 'Running header. Partial object is fine. header.logo is independent of logo.position.'],
       ['`header.text`', 'string ≤200', 'empty', FIELD_HELP.headerText],
       ['`header.showDate`', 'boolean', String(DEFAULT_SETTINGS.header.showDate), FIELD_HELP.headerShowDate],
+      ['`header.logo`', 'object or `null`', '`null`', FIELD_HELP.headerLogo],
       ['`footer`', 'object', 'see below', 'Running footer. Partial object is fine.'],
       ['`footer.text`', 'string ≤200', 'empty', FIELD_HELP.footerText],
       ['`footer.pageNumbers`', 'boolean', String(DEFAULT_SETTINGS.footer.pageNumbers), FIELD_HELP.footerPageNumbers],

@@ -245,7 +245,11 @@ function Editor() {
       try {
         const { dataUrl, name, width, height } = await fileToDataUrl(file, { maxSize: 600 });
         const aspect = width && height ? width / height : 1;
-        setSettings({ ...settings, logo: { dataUrl, name, aspect, position: settings.logo?.position || 'title-right', size: settings.logo?.size || 'md' } });
+        const nextLogo = { dataUrl, name, aspect, position: settings.logo?.position || 'title-right', size: settings.logo?.size || 'md' };
+        const nextHeader = settings.header?.logo
+          ? { ...settings.header, logo: { dataUrl, name, aspect } }
+          : settings.header;
+        setSettings({ ...settings, logo: nextLogo, header: nextHeader });
         toast.success('Logo added');
       } catch (err) {
         toast.error(err.message);

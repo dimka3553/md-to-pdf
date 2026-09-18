@@ -11,36 +11,41 @@ import {
   PAGE_BREAK_MODES,
   PAPER_SIZES,
   THEMES,
-  normalizeSettings,
 } from '../document/settings.js';
 import { buildDocumentHtml } from '../document/html.js';
 import { inferTitle } from '../document/utils.js';
-import { assertMarkdownSize, sanitizeAssets, safeFileName } from '../document/limits.js';
+import { safeFileName } from '../document/limits.js';
 import { TEMPLATES, getTemplate } from '../templates.js';
 import { renderPdf } from '../pdf/generate.js';
 import { describeScrapeError, sanitizeUrl, scrapePage, validateUrl } from '../scraper/scraper.js';
 import { analyzeMarkdown } from './analyze.js';
-import { ARGUMENT_CATALOG, FIELD_HELP, TEMPLATE_IDS } from './arguments.js';
+import { ARGUMENT_CATALOG, ASK_STYLES_MODE, FIELD_HELP, TEMPLATE_IDS } from './arguments.js';
 import { GUIDE_VERSION, MARKDOWN_GUIDE } from './guide.js';
 import { persistDownload } from '../downloads.js';
+import { persistDocument } from '../documents.js';
+import { documentIdNote, resolveDocumentSource } from './input.js';
 import { SITE_URL } from '../site.js';
 
 export const SERVER_INFO = { name: 'markdown-studio', version: GUIDE_VERSION };
 
+const STYLE_LEAD = ASK_STYLES_MODE === 'never'
+  ? 'Apply a recipe from the guide and render. Default chrome is minimal: no running header — never repeat the document title at the top of every page; the H1 already prints once.'
+  : ASK_STYLES_MODE === 'always'
+    ? 'When a user asks you to make a nice PDF, list the design options (theme, paper, fonts, TOC, cover, header/footer, logo, file name) in plain language, recommend a starting set, and wait for their answer before calling render_pdf. Default chrome is minimal: no running header — never repeat the document title at the top of every page; the H1 already prints once.'
+    : 'When a person is choosing a look, list the design options (theme, paper, fonts, TOC, cover, header/footer, logo, file name) in plain language, recommend a starting set, and wait. Skip the wait on agentic or unattended runs — they already asked you to render, said you may decide, or supplied settings. Default chrome is minimal: no running header — never repeat the document title at the top of every page; the H1 already prints once.';
+
 export const SERVER_INSTRUCTIONS = `Markdown Studio turns Markdown into polished, print-ready PDFs (themes, cover page, table of contents, running header/footer, callouts, Mermaid diagrams, syntax-highlighted code).
 
-When a user asks you to make a nice PDF, you MUST list the design options (theme, paper, fonts, TOC, cover, header/footer, logo, file name) in plain language, recommend a starting set, and wait for their answer before calling render_pdf. Do this every time, including re-renders. Default chrome is minimal: no running header — never repeat the document title at the top of every page; the H1 already prints once. Call list_design_options if you need the live enum JSON.
+${STYLE_LEAD} Call list_design_options if you need the live enum JSON.
 
-Recommended flow:
-1. Call get_markdown_guide once per session and follow it — it lists which syntax renders (no LaTeX, no HTML layouts, no YAML front-matter) and every tool/settings argument.
-2. Optionally call list_templates / get_template for a proven structure and matching design settings.
-3. List style options, recommend a starting set (empty running header), and wait. Do not call render_pdf until they pick or say you may decide.
-4. Write the Markdown, then call analyze_markdown and fix every warning. Default to automatic pagination; for deliberate section boundaries put \\pagebreak on its own paragraph BEFORE the heading (or \`{: .newpage }\` on the heading), never between its introduction and table. Do not put \`---\` above headings — H2s already have a rule. See the guide's Page breaks rules.
-5. Call render_pdf (returns a 24-hour download URL in the text, not a base64 PDF) or render_html. Read the LAYOUT REPORT in the result — it lists every page, where each block sits (y% from the top), how it looks (type, colour, size), and where page breaks happened. Fix stranded headings or sparse pages with \\pagebreak / \`{: .newpage }\` and re-render. Do not screenshot the PDF (or open it in a browser) to find page breaks; analyze_markdown cannot assess physical page layout.
-6. Immediately give the user that download URL (markdown link). In Cursor, also open it in a canvas whose iframe src is the URL. Details under "After rendering" below.
-All tools are stateless; pass the full markdown each time.
+Recommended flow (three tools on the happy path):
+1. Call get_markdown_guide once per session — syntax, anti-patterns, recipes and the full settings table.
+2. Optionally call list_templates (pass id to fetch Markdown) for a proven structure.
+3. Write the Markdown, then call analyze_markdown and fix every warning. Keep the returned documentId. Default to automatic pagination; for deliberate section boundaries put \\pagebreak on its own paragraph BEFORE the heading (or \`{: .newpage }\` on the heading). Do not put \`---\` above headings — H2s already have a rule.
+4. Call render_pdf with documentId + settings (or markdown the first time). Returns a 24-hour download URL and a LAYOUT REPORT. Re-render with the same documentId and a settings patch — do not resend the Markdown. render_html returns a URL the same way (pass inline: true only if you need the HTML in context).
+5. Immediately give the user that download URL (markdown link). In Cursor, also open it in a canvas whose iframe src is the URL.
 
-When the source is a web page (an article, docs page, blog post, changelog…), call import_web_page with the URL first: it loads the page in a headless browser, strips navigation/ads and returns clean Markdown plus an analysis. Then polish that Markdown (fix the warnings), ask for styles, and render it — do not re-type page content from memory.
+When the source is a web page, call import_web_page first; polish the Markdown, then pass its documentId to render_pdf — do not re-type page content from memory.
 
 ${ARGUMENT_CATALOG}`;
 
@@ -49,6 +54,16 @@ const keys = (o) => Object.keys(o);
 // ---- Schemas -----------------------------------------------------------------------------------
 
 const HexColor = z.string().regex(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i, 'Use #rgb or #rrggbb');
+
+const HeaderLogoSchema = z
+  .object({
+    dataUrl: z.string().startsWith('data:image/').describe(FIELD_HELP.logoDataUrl),
+    name: z.string().max(200).optional().describe(FIELD_HELP.logoName),
+    aspect: z.number().positive().optional().describe(FIELD_HELP.logoAspect),
+  })
+  .partial({ name: true, aspect: true })
+  .nullable()
+  .describe(FIELD_HELP.headerLogo);
 
 export const SettingsSchema = z
   .object({
@@ -69,9 +84,10 @@ export const SettingsSchema = z
       .object({
         text: z.string().max(200).describe(FIELD_HELP.headerText),
         showDate: z.boolean().describe(FIELD_HELP.headerShowDate),
+        logo: HeaderLogoSchema,
       })
       .partial()
-      .describe('Running header. Partial object is fine; omitted fields keep defaults.'),
+      .describe('Running header. Partial object is fine; omitted fields keep defaults. header.logo is independent of logo.position.'),
     footer: z
       .object({
         text: z.string().max(200).describe(FIELD_HELP.footerText),
@@ -112,6 +128,8 @@ const AssetsSchema = z
 
 const MarkdownSchema = z.string().min(1).max(2 * 1024 * 1024).describe(FIELD_HELP.markdown);
 
+const DocumentIdSchema = z.string().regex(/^[a-f0-9]{32}$/).describe(FIELD_HELP.documentId);
+
 const FileNameSchema = z.string().max(120).optional().describe(FIELD_HELP.fileName);
 
 const UrlSchema = z.string().min(1).max(2048).describe(FIELD_HELP.url);
@@ -141,6 +159,10 @@ function publicOrigin(ctx) {
   return SITE_URL;
 }
 
+function templateSummary(t) {
+  return { id: t.id, name: t.name, description: t.description, settings: t.settings || {} };
+}
+
 function designOptions() {
   const map = (obj, pick) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, pick(v)]));
   return {
@@ -153,16 +175,14 @@ function designOptions() {
     backgrounds: map(BACKGROUNDS, (b) => b.name),
     pageBreaks: map(PAGE_BREAK_MODES, (p) => p.name),
     logoPositions: map(LOGO_POSITIONS, (l) => l.name),
-    runningHeader: { logoPosition: 'page-header', logoHeightPx: 14, logoMaxWidthPx: 160, logoTextGapPx: 8, alignment: 'vertically centered', condition: 'Set logo.dataUrl and logo.position="page-header" for a header logo; add header.text for accompanying text. Either may be used alone; the gap is added only when both are present. Set logo.aspect to image width / height.' },
+    runningHeader: { headerLogo: true, logoHeightPx: 14, logoMaxWidthPx: 160, logoTextGapPx: 8, alignment: 'vertically centered', condition: 'Set header.logo (dataUrl + aspect) for a header logo independently of logo.position, so a cover/title logo can coexist. logo.position="page-header" remains a legacy shortcut. Add header.text for accompanying text. Either may be used alone; the gap is added only when both are present.' },
     logoSizes: map(LOGO_SIZES, (l) => ({ name: l.name, heightPx: l.px })),
     placeholders: { '{title}': 'Replaced with the document title in header.text / footer.text' },
     pageBreakDirective: '\\pagebreak on its own line, or {: .newpage } on a heading',
     imageSizeHint: '![alt](url =WIDTHxHEIGHT) — either dimension may be omitted, e.g. =300x',
+    templates: TEMPLATES.map(templateSummary),
+    askStyles: ASK_STYLES_MODE,
   };
-}
-
-function templateSummary(t) {
-  return { id: t.id, name: t.name, description: t.description, settings: t.settings || {} };
 }
 
 /**
@@ -189,7 +209,7 @@ export function registerMarkdownStudio(server) {
     {
       title: 'List design options',
       description:
-        'JSON catalog of every valid `settings` value: defaults, themes (colours, dark/light, default fonts), fonts, font sizes, paper sizes, margins, backgrounds, page-break modes, logo positions/sizes, `{title}` placeholder, page-break directive and image size hint. Present these options to the user and wait before calling render_pdf.',
+        'JSON catalog of every valid `settings` value: defaults, themes, fonts, paper, margins, backgrounds, page-break modes, logo positions/sizes, template summaries, `{title}` placeholder, page-break directive and image size hint.',
       inputSchema: z.object({}),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
@@ -203,11 +223,22 @@ export function registerMarkdownStudio(server) {
     'list_templates',
     {
       title: 'List templates',
-      description: 'Starter documents (business report, proposal, README, meeting notes, invoice, résumé, feature tour). Each has a proven heading structure and recommended design settings. Use get_template to fetch the Markdown.',
-      inputSchema: z.object({}),
+      description: 'Starter documents (business report, proposal, README, meeting notes, invoice, résumé, feature tour). Omit id to list them; pass id to fetch that template\'s Markdown and recommended settings (same as get_template).',
+      inputSchema: z.object({
+        id: z.enum(TEMPLATE_IDS).optional().describe(FIELD_HELP.templateId),
+      }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async () => {
+    async ({ id } = {}) => {
+      if (id) {
+        const t = getTemplate(id);
+        if (!t) return toolError(`Unknown template "${id}".`);
+        const result = { ...templateSummary(t), markdown: t.markdown };
+        return {
+          content: [text(`Template "${t.name}" — recommended settings:\n${json(result.settings)}\n\n---\n\n${t.markdown}`)],
+          structuredContent: result,
+        };
+      }
       const templates = TEMPLATES.map(templateSummary);
       return { content: [text(json(templates))], structuredContent: { templates } };
     },
@@ -217,7 +248,7 @@ export function registerMarkdownStudio(server) {
     'get_template',
     {
       title: 'Get template',
-      description: 'Fetch a template by id: its Markdown source and the design settings it was designed for. Use the structure as a skeleton and pass the settings to render_pdf.',
+      description: 'Alias of list_templates with id. Prefer list_templates — same result, one fewer tool to approve.',
       inputSchema: z.object({
         id: z.enum(TEMPLATE_IDS).describe(FIELD_HELP.templateId),
       }),
@@ -239,22 +270,27 @@ export function registerMarkdownStudio(server) {
     {
       title: 'Analyze Markdown',
       description:
-        'Lint a Markdown document for this renderer before rendering. Returns the inferred title, an outline, content statistics and a list of warnings with line numbers (skipped heading levels, code fences without a language, YAML front-matter, LaTeX, raw HTML, ragged tables, missing assets, undefined footnotes, hand-written TOC/numbering…). Fix all "warning"-severity items; "info" items are suggestions.',
+        'Lint a Markdown document for this renderer before rendering. Pass markdown (first time) or documentId (reuse). Returns a documentId, the inferred title, an outline, content statistics and a list of warnings with line numbers. Fix all "warning"-severity items; "info" items are suggestions. Reuse documentId on render_pdf / render_html with a settings patch so you do not resend the document.',
       inputSchema: z.object({
-        markdown: MarkdownSchema,
+        markdown: MarkdownSchema.optional(),
+        documentId: DocumentIdSchema.optional(),
         settings: SettingsSchema.optional(),
-        assets: AssetsSchema.optional().describe('Pass the same assets you will render with so asset: references can be checked.'),
+        assets: AssetsSchema.optional().describe('Pass the same assets you will render with so asset: references can be checked. Omitted when documentId is set.'),
       }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async ({ markdown, settings, assets }) => {
+    async ({ markdown, documentId, settings, assets }) => {
       try {
-        assertMarkdownSize(markdown);
-        const report = analyzeMarkdown(markdown, { assets: sanitizeAssets(assets), toc: !!settings?.toc });
+        const doc = await resolveDocumentSource({ markdown, documentId, settings, assets });
+        const report = analyzeMarkdown(doc.markdown, { assets: doc.assets, toc: !!doc.settings.toc });
         const summary = report.warnings.length
           ? `${report.warnings.filter((w) => w.severity === 'warning').length} warning(s), ${report.warnings.filter((w) => w.severity === 'info').length} suggestion(s).`
           : 'No issues found.';
-        return { content: [text(`${summary}\n\n${json(report)}`)], structuredContent: report };
+        const idLine = documentIdNote(doc);
+        return {
+          content: [text([summary, idLine, '', json({ ...report, documentId: doc.documentId })].filter(Boolean).join('\n'))],
+          structuredContent: { ...report, documentId: doc.documentId, expiresAt: doc.expiresAt ? new Date(doc.expiresAt).toISOString() : null },
+        };
       } catch (err) {
         return toolError(err.message);
       }
@@ -262,7 +298,8 @@ export function registerMarkdownStudio(server) {
   );
 
   const renderInput = z.object({
-    markdown: MarkdownSchema,
+    markdown: MarkdownSchema.optional(),
+    documentId: DocumentIdSchema.optional(),
     settings: SettingsSchema.optional(),
     assets: AssetsSchema.optional(),
     fileName: FileNameSchema,
@@ -273,23 +310,69 @@ export function registerMarkdownStudio(server) {
     {
       title: 'Render HTML',
       description:
-        'Render Markdown + settings to a complete standalone HTML document (same CSS, fonts and layout as the PDF, without page breaks). Same arguments as render_pdf: markdown, settings, assets, fileName. Fast — no headless browser. Useful to inspect the output or to hand to a browser/printer yourself. Returns the HTML as an embedded text/html resource.',
-      inputSchema: renderInput,
+        'Render Markdown + settings to a complete standalone HTML document (same CSS, fonts and layout as the PDF, without page breaks). Arguments: markdown or documentId, settings, assets, fileName, inline. Fast — no headless browser. Returns a 24-hour https download URL by default (like render_pdf). Pass inline: true only if you need the HTML embedded in the tool result (often 30 KB+ of CSS/JS).',
+      inputSchema: renderInput.extend({
+        inline: z.boolean().optional().describe(FIELD_HELP.inlineHtml),
+      }),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async ({ markdown, settings, assets, fileName }, ctx) => {
+    async ({ markdown, documentId, settings, assets, fileName, inline = false }, ctx) => {
+      let doc;
       try {
-        assertMarkdownSize(markdown);
-        const cleanAssets = sanitizeAssets(assets);
-        const normalized = normalizeSettings(settings);
-        const title = fileName || inferTitle(markdown, 'document');
-        const html = buildDocumentHtml({ markdown, settings: normalized, assets: cleanAssets, mode: 'pdf', title: fileName });
+        doc = await resolveDocumentSource({ markdown, documentId, settings, assets, fileName });
+      } catch (err) {
+        return toolError(err.message);
+      }
+      try {
+        const title = doc.fileName || inferTitle(doc.markdown, 'document');
+        const html = buildDocumentHtml({ markdown: doc.markdown, settings: doc.settings, assets: doc.assets, mode: 'pdf', title: doc.fileName });
         const name = safeFileName(title, 'html');
+        let download;
+        try {
+          download = await persistDownload({
+            body: Buffer.from(html, 'utf8'),
+            fileName: name,
+            origin: publicOrigin(ctx),
+            mimeType: 'text/html',
+          });
+        } catch (err) {
+          console.error('[mcp] persist html failed:', err);
+          return toolError(`HTML rendered but could not be stored for download: ${err.message}`);
+        }
+        const kb = (Buffer.byteLength(html, 'utf8') / 1024).toFixed(1);
+        const summary = [
+          `Rendered "${name}" — ${kb} KB (theme "${doc.settings.theme}").`,
+          `Download (expires in 24h): ${download.url}`,
+          documentIdNote(doc),
+          inline ? 'The full HTML follows as an embedded resource because inline=true.' : 'Pass inline: true only if you need the HTML in context; the URL is enough to inspect styling.',
+        ].filter(Boolean).join('\n');
+        const content = [
+          text(summary),
+          {
+            type: 'resource_link',
+            uri: download.url,
+            name,
+            title: name,
+            mimeType: 'text/html',
+            description: `Rendered HTML, ${kb} KB. Expires ${new Date(download.expiresAt).toISOString()}.`,
+            size: Buffer.byteLength(html, 'utf8'),
+          },
+        ];
+        if (inline) {
+          content.push({ type: 'resource', resource: { uri: `markdown-studio://render/${encodeURIComponent(name)}`, mimeType: 'text/html', text: html } });
+        }
         return {
-          content: [
-            text(`Rendered ${name} (${(Buffer.byteLength(html, 'utf8') / 1024).toFixed(1)} KB) with theme "${normalized.theme}". The full HTML follows as an embedded resource. For a PDF call render_pdf, or POST the same body to ${publicOrigin(ctx)}/api/convert with "format": "html" or omit it for a PDF.`),
-            { type: 'resource', resource: { uri: `markdown-studio://render/${encodeURIComponent(name)}`, mimeType: 'text/html', text: html } },
-          ],
+          content,
+          structuredContent: {
+            fileName: name,
+            bytes: Buffer.byteLength(html, 'utf8'),
+            title,
+            settings: doc.settings,
+            downloadUrl: download.url,
+            expiresAt: new Date(download.expiresAt).toISOString(),
+            documentId: doc.documentId,
+            inline,
+          },
         };
       } catch (err) {
         return toolError(err.message);
@@ -302,23 +385,21 @@ export function registerMarkdownStudio(server) {
     {
       title: 'Render PDF',
       description:
-        'Render Markdown + settings to a PDF with headless Chromium (takes 3–15 s). Do not call this until you have listed style options (theme, paper, fonts, TOC, cover, header/footer) and the user has answered — every time, including re-renders. Default: no running header; do not put the document title or {title} on every page. Arguments: markdown (required), settings (optional design object — every field is documented on the schema and in get_markdown_guide), assets (optional image data URLs), fileName (optional, no extension). Returns a 24-hour https download URL in the text block (and an MCP resource_link) — not a base64 application/pdf attachment — plus a LAYOUT REPORT: every page, y% position of each block, appearance (heading/table/callout/…, colours, sizes), page-break reasons and layout warnings. Read that report to judge pagination; do not screenshot the PDF. Give the user the URL as a markdown link. In Cursor, open it in a canvas iframe whose src is the URL. Run analyze_markdown first and fix its warnings.',
+        'Render Markdown + settings to a PDF with headless Chromium (takes 3–15 s). Arguments: markdown or documentId, settings (optional design object — merged over stored settings when documentId is set), assets, fileName. Default: no running header; do not put the document title or {title} on every page. Returns a 24-hour https download URL in the text block (and an MCP resource_link) — not a base64 application/pdf attachment — plus a LAYOUT REPORT. Read that report to judge pagination; do not screenshot the PDF. Give the user the URL as a markdown link. Reuse documentId with a settings patch instead of resending the Markdown.',
       inputSchema: renderInput,
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
     },
-    async ({ markdown, settings, assets, fileName }, ctx) => {
-      let cleanAssets;
+    async ({ markdown, documentId, settings, assets, fileName }, ctx) => {
+      let doc;
       try {
-        assertMarkdownSize(markdown);
-        cleanAssets = sanitizeAssets(assets);
+        doc = await resolveDocumentSource({ markdown, documentId, settings, assets, fileName });
       } catch (err) {
         return toolError(err.message);
       }
-      const normalized = normalizeSettings(settings);
-      const requested = fileName ? String(fileName).slice(0, 120) : '';
+      const requested = doc.fileName || '';
       const started = Date.now();
       try {
-        const { pdf, title, layout } = await renderPdf({ markdown, settings: normalized, assets: cleanAssets, title: requested, includeLayout: true });
+        const { pdf, title, layout } = await renderPdf({ markdown: doc.markdown, settings: doc.settings, assets: doc.assets, title: requested, includeLayout: true });
         const name = safeFileName(requested || title, 'pdf');
         const seconds = ((Date.now() - started) / 1000).toFixed(1);
         const kb = (pdf.length / 1024).toFixed(0);
@@ -329,19 +410,20 @@ export function registerMarkdownStudio(server) {
           console.error('[mcp] persist download failed:', err);
           return toolError(`PDF rendered but could not be stored for download: ${err.message}`);
         }
-        const extras = [normalized.toc ? 'TOC' : '', normalized.cover.enabled ? 'cover page' : ''].filter(Boolean);
+        const extras = [doc.settings.toc ? 'TOC' : '', doc.settings.cover.enabled ? 'cover page' : ''].filter(Boolean);
         const extra = extras.length ? `, ${extras.join(', ')}` : '';
         const pages = layout?.pageCount ? `${layout.pageCount} page${layout.pageCount === 1 ? '' : 's'}` : '';
         const summary = [
-          `Rendered "${name}" — ${kb} KB in ${seconds}s (${pages ? `${pages}, ` : ''}theme "${normalized.theme}", ${normalized.paperSize} ${normalized.orientation}${extra}).`,
+          `Rendered "${name}" — ${kb} KB in ${seconds}s (${pages ? `${pages}, ` : ''}theme "${doc.settings.theme}", ${doc.settings.paperSize} ${doc.settings.orientation}${extra}).`,
           `Download (expires in 24h): ${download.url}`,
+          documentIdNote(doc),
           '',
           `Give the user that URL as a markdown link named "${name}". Do not wait for an attached application/pdf blob — many clients drop those, and this tool does not send one. There is nothing to decode with base64. If this client can show PDFs inline, open the URL there (Cursor: a canvas with <iframe src="${download.url}">). If it cannot, the link is the deliverable.`,
           '',
-          'Read the LAYOUT REPORT below to judge page breaks, placement and styling. Do not screenshot the PDF or render it in a browser unless a logo, diagram or colour is still unclear. If a heading is stranded or a page is too empty, insert \\pagebreak / {: .newpage } before the section heading (or change settings) and call render_pdf again.',
+          'Read the LAYOUT REPORT below to judge page breaks, placement and styling. Do not screenshot the PDF or render it in a browser unless a logo, diagram or colour is still unclear. If a heading is stranded or a page is too empty, insert \\pagebreak / {: .newpage } before the section heading (or change settings) and call render_pdf again with the same documentId.',
           '',
           layout?.text || 'Layout report unavailable.',
-        ].join('\n');
+        ].filter((line) => line !== undefined).join('\n');
         return {
           content: [
             text(summary),
@@ -360,9 +442,10 @@ export function registerMarkdownStudio(server) {
             bytes: pdf.length,
             renderMs: Date.now() - started,
             title,
-            settings: normalized,
+            settings: doc.settings,
             downloadUrl: download.url,
             expiresAt: new Date(download.expiresAt).toISOString(),
+            documentId: doc.documentId,
             pageCount: layout?.pageCount || 0,
             layoutIssues: layout?.issues || [],
             pages: layout?.pages || [],
@@ -425,6 +508,10 @@ export function registerMarkdownStudio(server) {
         const report = analyzeMarkdown(content);
         const warnings = report.warnings.filter((w) => w.severity === 'warning').length;
         const infos = report.warnings.length - warnings;
+        const saved = await persistDocument({
+          markdown: content,
+          fileName: baseName.replace(/\.md$/, ''),
+        }).catch(() => null);
         const summary = [
           `Imported "${meta.title || target}" from ${host} in ${seconds}s — ${report.stats.words.toLocaleString()} words, ${report.outline.length} headings, ${report.stats.images} images, ${report.stats.tables} tables, ${report.stats.codeBlocks} code blocks.`,
           meta.description ? `Description: ${meta.description}` : '',
@@ -432,6 +519,7 @@ export function registerMarkdownStudio(server) {
           report.warnings.length ? `analyze_markdown found ${warnings} warning(s) and ${infos} suggestion(s) — fix the warnings before rendering:` : 'analyze_markdown found no issues.',
           ...report.warnings.slice(0, 12).map((w) => `- [${w.severity}] ${w.line ? `line ${w.line}: ` : ''}${w.message}`),
           report.warnings.length > 12 ? `- … ${report.warnings.length - 12} more (call analyze_markdown for the full list)` : '',
+          saved?.id ? `documentId: ${saved.id} — pass this to render_pdf with a settings patch (or to analyze_markdown after you edit the Markdown).` : '',
           '',
           `Suggested fileName: "${baseName.replace(/\.md$/, '')}". The Markdown follows as an embedded resource; keep the source URL as a footnote or a closing "Source" line when you render it.`,
         ]
@@ -440,7 +528,7 @@ export function registerMarkdownStudio(server) {
 
         return {
           content: [text(summary), resource],
-          structuredContent: { url: target, format: 'markdown', ...meta, fileName: baseName.replace(/\.md$/, ''), stats: report.stats, outline: report.outline, warnings: report.warnings, durationMs: Date.now() - started },
+          structuredContent: { url: target, format: 'markdown', ...meta, fileName: baseName.replace(/\.md$/, ''), stats: report.stats, outline: report.outline, warnings: report.warnings, durationMs: Date.now() - started, documentId: saved?.id || null },
         };
       } catch (err) {
         console.error('[mcp] import_web_page failed:', err.message);
@@ -508,13 +596,15 @@ export function registerMarkdownStudio(server) {
               '',
               'Rules:',
               '- Follow the Markdown Studio authoring guide exactly (call get_markdown_guide if you have not read it in this session).',
-              kind && kind !== 'other' ? `- Start from the "${kind}" template (get_template) for structure. Do not copy a running header that repeats the title.` : '- Pick the closest template from list_templates for structure.',
+              kind && kind !== 'other' ? `- Start from the "${kind}" template (list_templates with id) for structure. Do not copy a running header that repeats the title.` : '- Pick the closest template from list_templates for structure.',
               '- One `#` title, `##` sections, tables for structured data, callouts for key points, titled code blocks for code.',
               '- Do not put `---` above headings; H2s already have a rule and a divider looks like a double line.',
               '- Do not write a manual table of contents or number headings by hand; use settings.toc / settings.headingNumbers.',
-              '- Before render_pdf: list style options (theme, paper, fonts, TOC, cover, header/footer), recommend a starting set with an empty running header, and wait for the user. Never put the H1/{title} in header.text.',
-              '- Run analyze_markdown and fix every warning before rendering.',
-              '- Finish by calling render_pdf with the chosen settings. Read the LAYOUT REPORT (do not screenshot the PDF). Then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL) and report the file name.',
+              ASK_STYLES_MODE === 'always'
+                ? '- Before render_pdf: list style options, recommend a starting set with an empty running header, and wait. Never put the H1/{title} in header.text.'
+                : '- Recommend a recipe (empty running header). Wait only if a person is choosing a look; otherwise render. Never put the H1/{title} in header.text.',
+              '- Run analyze_markdown and fix every warning. Keep the documentId.',
+              '- Finish by calling render_pdf with documentId + settings. Read the LAYOUT REPORT (do not screenshot the PDF). Then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL) and report the file name.',
             ].join('\n'),
           },
         },
@@ -542,7 +632,7 @@ export function registerMarkdownStudio(server) {
               '1. Call analyze_markdown on it and read the warnings.',
               '2. Apply the authoring guide (get_markdown_guide): a single H1, no skipped heading levels, no `---` above headings, languages on code fences, GitHub callouts instead of bold "Note:" lines, real tables instead of aligned text, footnotes for sources, no LaTeX/HTML/front-matter.',
               '3. Re-run analyze_markdown until there are no warnings.',
-              '4. Suggest a full settings object (theme, paper, fonts, TOC, cover, header/footer) using the argument catalog — empty running header unless they asked for a brand line — list the options, wait, then return the polished Markdown.',
+              '4. Suggest a settings object using the argument catalog — empty running header unless they asked for a brand line — then return the polished Markdown (and render if they asked for a PDF).',
               '',
               '```md',
               markdown,
@@ -581,8 +671,8 @@ export function registerMarkdownStudio(server) {
               '2. Clean the Markdown without changing its meaning: keep a single H1 (the page title), remove leftover navigation/"share"/"related" fragments, delete `---` above headings, fix skipped heading levels, add languages to code fences, turn "Note:"-style paragraphs into callouts, and drop broken or tracking links. Keep images that carry information; drop decorative ones.',
               '3. Add a closing line or footnote with the source URL and the import date.',
               '4. Run analyze_markdown until there are no warnings.',
-              '5. List design options (theme, paper, TOC, header/footer, page numbers) and wait — pick "clean" + toc for docs, "editorial" for long-form articles. Default: no running header (do not put the article title or site name on every page). Apply what they confirm.',
-              '6. Call render_pdf with markdown + settings + fileName (use the suggested fileName). Read the LAYOUT REPORT instead of screenshotting. Then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL) and report the result.',
+              '5. Recommend design settings (theme, paper, TOC, header/footer, page numbers) — pick "clean" + toc for docs, "editorial" for long-form articles. Default: no running header (do not put the article title or site name on every page). Wait only if a person is choosing; otherwise apply the recipe.',
+              '6. Call render_pdf with documentId (from import or analyze) + settings + fileName. Read the LAYOUT REPORT instead of screenshotting. Then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL) and report the result.',
             ]
               .filter(Boolean)
               .join('\n'),
@@ -616,14 +706,14 @@ export function registerMarkdownStudio(server) {
               brief ? `Brief:\n${brief}` : '',
               markdown ? `Existing Markdown:\n\`\`\`md\n${markdown}\n\`\`\`` : '',
               '',
-              'You must list the available arguments to the user (from get_markdown_guide / list_design_options / server instructions) and wait for their answer before render_pdf, every time:',
+              'You must know the available arguments (from get_markdown_guide / list_design_options / server instructions). When a person is choosing a look, list them and wait; on an unattended run apply a recipe:',
               '- Look: theme, accentColor, font, headingFont, fontSize, background',
               '- Page: paperSize, orientation, margins',
               '- Structure: toc, headingNumbers, cover (enabled, title, subtitle, author, date, showLogo), pageBreaks',
               '- Chrome: header.text (default empty — do not repeat the title), header.showDate, footer.text, footer.pageNumbers, footer.pageNumberStyle, logo',
               '- Output: fileName; optional assets for local images',
-              'Recommend a recipe for this document type with an empty running header (do not repeat the H1 on every page). Wait for them to pick or say you may decide, then apply that.',
-              'Follow the authoring guide (no `---` above headings). Run analyze_markdown and fix warnings. Call render_pdf with markdown + settings + assets + fileName. Read the LAYOUT REPORT (do not screenshot the PDF). Then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL). Tell them the file name and which settings you used.',
+              'Recommend a recipe for this document type with an empty running header (do not repeat the H1 on every page). Wait only if they are choosing; if they said you may decide, apply that.',
+              'Follow the authoring guide (no `---` above headings). Run analyze_markdown and fix warnings (keep documentId). Call render_pdf with documentId + settings + fileName. Read the LAYOUT REPORT (do not screenshot the PDF). Then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL). Tell them the file name and which settings you used.',
             ]
               .filter(Boolean)
               .join('\n'),

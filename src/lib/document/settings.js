@@ -200,27 +200,34 @@ export const DEFAULT_SETTINGS = {
   toc: false,
   headingNumbers: false,
   justify: false,
-  logo: null, // { dataUrl, name, position, size, aspect }
-  header: { text: '', showDate: false },
+  logo: null, // { dataUrl, name, position, size, aspect } — title / cover / watermark
+  header: { text: '', showDate: false, logo: null }, // logo is independent of logo.position
   footer: { text: '', pageNumbers: true, pageNumberStyle: 'n-of-total' },
   cover: { enabled: false, title: '', subtitle: '', author: '', date: '', showLogo: true },
 };
 
 const pick = (value, allowed, fallback) => (value && allowed[value] ? value : fallback);
 
+function normalizeImage(raw, fallbackName = 'logo') {
+  if (!raw || typeof raw !== 'object' || typeof raw.dataUrl !== 'string' || !raw.dataUrl.startsWith('data:image/')) return null;
+  return {
+    dataUrl: raw.dataUrl,
+    name: typeof raw.name === 'string' ? raw.name.slice(0, 200) : fallbackName,
+    aspect: Number.isFinite(raw.aspect) && raw.aspect > 0 ? Math.min(20, Math.max(0.1, raw.aspect)) : 1,
+  };
+}
+
 /** Normalise arbitrary input (localStorage, API body) into a safe settings object. */
 export function normalizeSettings(input) {
   const s = input && typeof input === 'object' ? input : {};
   const d = DEFAULT_SETTINGS;
 
-  const logo = s.logo && typeof s.logo === 'object' && typeof s.logo.dataUrl === 'string' && s.logo.dataUrl.startsWith('data:image/')
+  const image = normalizeImage(s.logo);
+  const logo = image
     ? {
-        dataUrl: s.logo.dataUrl,
-        name: typeof s.logo.name === 'string' ? s.logo.name.slice(0, 200) : 'logo',
+        ...image,
         position: pick(s.logo.position, LOGO_POSITIONS, 'title-right'),
         size: pick(s.logo.size, LOGO_SIZES, 'md'),
-        // width / height, used to size the logo when it is drawn in the page header.
-        aspect: Number.isFinite(s.logo.aspect) && s.logo.aspect > 0 ? Math.min(20, Math.max(0.1, s.logo.aspect)) : 1,
       }
     : null;
 
@@ -244,6 +251,7 @@ export function normalizeSettings(input) {
     header: {
       text: str(s.header?.text, 200),
       showDate: !!s.header?.showDate,
+      logo: normalizeImage(s.header?.logo, 'header-logo'),
     },
     footer: {
       text: str(s.footer?.text, 200),
@@ -259,6 +267,46 @@ export function normalizeSettings(input) {
       showLogo: s.cover?.showLogo !== false,
     },
   };
+}
+
+/**
+ * Deep-merge a settings patch over a previously stored (or empty) object, then
+ * normalise. `null` on `logo` / `header.logo` clears that image; omitted keys keep the base.
+ */
+export function mergeSettings(base, patch) {
+  const current = base && typeof base === 'object' ? base : {};
+  if (!patch || typeof patch !== 'object') return normalizeSettings(current);
+
+  const logo = patch.logo === null
+    ? null
+    : patch.logo && typeof patch.logo === 'object'
+      ? { ...(current.logo || {}), ...patch.logo }
+      : current.logo;
+
+  let header = current.header;
+  if (patch.header && typeof patch.header === 'object') {
+    header = { ...(current.header || {}), ...patch.header };
+    if (patch.header.logo === null) header.logo = null;
+    else if (patch.header.logo && typeof patch.header.logo === 'object') {
+      header.logo = { ...(current.header?.logo || {}), ...patch.header.logo };
+    }
+  }
+
+  return normalizeSettings({
+    ...current,
+    ...patch,
+    logo,
+    header,
+    footer: patch.footer && typeof patch.footer === 'object' ? { ...(current.footer || {}), ...patch.footer } : current.footer,
+    cover: patch.cover && typeof patch.cover === 'object' ? { ...(current.cover || {}), ...patch.cover } : current.cover,
+  });
+}
+
+/** Running-header logo: dedicated header.logo, or the legacy logo.position="page-header". */
+export function headerLogoOf(settings) {
+  if (settings?.header?.logo) return settings.header.logo;
+  if (settings?.logo?.position === 'page-header') return settings.logo;
+  return null;
 }
 
 function str(v, max) {
@@ -286,7 +334,7 @@ export function resolveDesign(settings) {
     margins: MARGINS[settings.margins],
     pageWidth,
     pageHeight,
-    hasRunningHeader: !!(settings.header.text.trim() || settings.header.showDate || settings.logo?.position === 'page-header'),
+    hasRunningHeader: !!(settings.header.text.trim() || settings.header.showDate || headerLogoOf(settings)),
     hasRunningFooter: !!(settings.footer.text || settings.footer.pageNumbers),
   };
 }

@@ -28,13 +28,13 @@ Markdown Studio exposes a remote MCP server at \`${MCP_URL}\` (Streamable HTTP, 
 
 | Tool | Use it to |
 | --- | --- |
-| \`get_markdown_guide\` | Read the full authoring guide **and** every tool/settings argument (same content as below) |
-| \`list_templates\` / \`get_template\` | Start from a proven structure with matching design settings |
-| \`list_design_options\` | JSON of every valid \`settings\` value (themes, fonts, paper, …) — relay these when the user wants a nice PDF |
-| \`import_web_page\` | Turn a public URL into clean Markdown + metadata + analysis (\`url\`, \`format\`, \`stripImages\`, \`stripLinks\`) |
-| \`analyze_markdown\` | Lint before rendering; fix every warning it reports |
-| \`render_html\` | Quick standalone HTML preview (\`markdown\`, \`settings\`, \`assets\`, \`fileName\`) |
-| \`render_pdf\` | Final PDF as a 24-hour download URL in the text (\`https://<host>/d/<id>.pdf\`) plus an MCP \`resource_link\` **and a LAYOUT REPORT** (every page, y% of each block, appearance, break reasons, warnings). Read the report instead of screenshotting. Give the user that URL right away (Cursor: canvas iframe src = the URL) |
+| \`get_markdown_guide\` | Read the full authoring guide **and** every tool/settings argument (same content as below). Call once per session. |
+| \`list_templates\` | Starter structure. Omit \`id\` to list; pass \`id\` to fetch Markdown (\`get_template\` is an alias) |
+| \`list_design_options\` | Optional JSON of every valid \`settings\` value (also includes template summaries) |
+| \`import_web_page\` | Turn a public URL into clean Markdown + metadata + analysis + \`documentId\` |
+| \`analyze_markdown\` | Lint before rendering; returns a \`documentId\` to reuse instead of resending Markdown |
+| \`render_html\` | Standalone HTML as a 24-hour URL (pass \`inline: true\` only if you need the HTML in context) |
+| \`render_pdf\` | Final PDF as a 24-hour download URL plus a LAYOUT REPORT. Pass \`documentId\` + a settings patch on re-renders |
 
 Prompts: \`write_document\`, \`polish_markdown\`, \`make_pdf\` (walk through every design argument, then render), \`pdf_from_url\` (import a page, clean it up, render).
 

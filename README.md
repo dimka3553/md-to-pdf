@@ -17,7 +17,7 @@ A Markdown editor that exports polished, print-ready PDFs — with a live previe
 - Body/heading fonts, text size, justified text
 - A4 / Letter / Legal, portrait or landscape, four margin presets
 - Page backgrounds (soft, gradient, dots, grid, lines)
-- Logo: beside the title, above the title, in the page header, on the cover, or as a watermark
+- Logo: beside the title, above the title, in the page header (independently of title/cover), on the cover, or as a watermark
 - Running header (text, date) and footer (text, page numbers)
 - Cover page, table of contents, numbered headings
 - Page-break control: smart section openings and compact tables, before every H1, or before every H1 and H2; manual `\pagebreak` or `{: .newpage }`
@@ -37,17 +37,17 @@ Markdown Studio ships a remote **MCP server** so coding agents (Cursor, Claude C
 https://md.dima.ua/api/mcp
 ```
 
-Streamable HTTP, stateless, no sign-up. It teaches the agent the exact syntax this renderer supports, lints the document, and renders it.
+Streamable HTTP, no sign-up. It teaches the agent the exact syntax this renderer supports, lints the document, and renders it. `analyze_markdown` / `import_web_page` return a `documentId` you can reuse with a settings patch so agents do not resend the Markdown on every render.
 
 | Tool | What it does |
 | --- | --- |
 | `get_markdown_guide` | The authoring guide: supported syntax, structure rules, design settings, recipes per document type, anti-patterns |
-| `list_design_options` | Every valid `settings` value (themes with colours/fonts, paper sizes, margins, backgrounds, …) |
-| `list_templates` / `get_template` | Starter documents (report, proposal, README, meeting notes, invoice, résumé) with matching settings |
-| `import_web_page` | Turn a public URL into clean Markdown (or HTML): rendered in headless Chromium (JavaScript executed, lazy content scrolled in), chrome stripped using the rendered layout, tables/code/callouts/figures preserved, absolute links, page metadata and the same analysis as `analyze_markdown`. Options `format`, `stripImages`, `stripLinks` |
-| `analyze_markdown` | Linter: outline, stats and line-numbered warnings (skipped heading levels, fences without a language, YAML front-matter, LaTeX, raw HTML, ragged tables, missing assets, undefined footnotes…) |
-| `render_html` | Standalone HTML with the same CSS as the PDF (fast, no browser) |
-| `render_pdf` | The PDF, stored for 24 hours. The tool result text contains `https://<host>/d/<id>.pdf` (and an MCP `resource_link`) **plus a LAYOUT REPORT**: every page, y% of each block, appearance, page-break reasons and warnings. Read that report instead of screenshotting. Give the user the URL; in Cursor, open it in a canvas iframe. No base64 attachment |
+| `list_design_options` | Every valid `settings` value (themes with colours/fonts, paper sizes, margins, backgrounds, template summaries, …) |
+| `list_templates` / `get_template` | Starter documents (report, proposal, README, meeting notes, invoice, résumé). `list_templates` accepts optional `id` so you do not need a second tool |
+| `import_web_page` | Turn a public URL into clean Markdown (or HTML): rendered in headless Chromium (JavaScript executed, lazy content scrolled in), chrome stripped using the rendered layout, tables/code/callouts/figures preserved, absolute links, page metadata and the same analysis as `analyze_markdown`. Returns a `documentId`. Options `format`, `stripImages`, `stripLinks` |
+| `analyze_markdown` | Linter: outline, stats and line-numbered warnings. Returns a `documentId` to reuse on render instead of resending Markdown |
+| `render_html` | Standalone HTML with the same CSS as the PDF, stored for 24 hours as `https://<host>/d/<id>.html`. Pass `inline: true` only if you need the HTML in the tool result |
+| `render_pdf` | The PDF, stored for 24 hours. The tool result text contains `https://<host>/d/<id>.pdf` (and an MCP `resource_link`) **plus a LAYOUT REPORT**. Pass `documentId` + a settings patch on re-renders. Read that report instead of screenshotting. Give the user the URL; in Cursor, open it in a canvas iframe. No base64 attachment |
 
 Also exposed: resources `markdown-studio://guide`, `markdown-studio://design-options`, `markdown-studio://templates/{id}` and prompts `write_document`, `polish_markdown`, `make_pdf`, `pdf_from_url` (import a page → clean up → render).
 
@@ -119,7 +119,7 @@ npm run dev
 
 PDFs are rendered with headless Chromium. Locally, an installed Google Chrome is used automatically (or set `PUPPETEER_EXECUTABLE_PATH`). On Vercel/Lambda, `@sparticuz/chromium` supplies a matching Chromium build from the function bundle (no runtime download).
 
-Environment variables (all optional): `NEXT_PUBLIC_SITE_URL` (public URL used in metadata and MCP responses), `MCP_API_KEY` (protects `/api/mcp`), `PUPPETEER_EXECUTABLE_PATH`. On Vercel, connect a **private** Blob store to the project so `render_pdf` can persist files; the SDK uses `BLOB_STORE_ID` + OIDC. Locally, PDFs are written under `DOWNLOAD_DIR` or the OS temp directory.
+Environment variables (all optional): `NEXT_PUBLIC_SITE_URL` (public URL used in metadata and MCP responses), `MCP_API_KEY` (protects `/api/mcp`), `MARKDOWN_STUDIO_ASK_STYLES` (`interactive` default — wait only when a person is choosing a look; `always` pauses every render; `never` skips the ask), `PUPPETEER_EXECUTABLE_PATH`. On Vercel, connect a **private** Blob store to the project so `render_pdf` / `render_html` can persist files; the SDK uses `BLOB_STORE_ID` + OIDC. Locally, files are written under `DOWNLOAD_DIR` or the OS temp directory.
 
 ## API
 
@@ -166,7 +166,7 @@ Renders Markdown to a PDF.
     "toc": true,
     "headingNumbers": false,
     "pageBreaks": "auto",
-    "header": { "text": "", "showDate": false },
+    "header": { "text": "", "showDate": false, "logo": null },
     "footer": { "text": "Confidential", "pageNumbers": true, "pageNumberStyle": "n-of-total" },
     "cover": { "enabled": false },
     "logo": { "dataUrl": "data:image/png;base64,...", "position": "title-right", "size": "md" }

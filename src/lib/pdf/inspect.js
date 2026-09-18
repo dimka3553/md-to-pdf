@@ -24,6 +24,7 @@ export function collectDomSnapshot() {
   }
 
   function kindOf(el) {
+    if (el.classList.contains('footnotes')) return 'footnotes';
     if (el.classList.contains('cover')) return 'cover';
     if (el.classList.contains('toc')) return 'toc';
     if (el.classList.contains('title-block')) return 'title';
@@ -189,6 +190,12 @@ export function collectDomSnapshot() {
       };
     } else if (kind === 'callout') {
       block.callout = { type: calloutType(el) };
+    } else if (kind === 'footnotes') {
+      const items = [...el.querySelectorAll('li')];
+      block.footnotes = {
+        entries: items.length,
+        preview: items.slice(0, 8).map((li) => clip(li.innerText, 80)),
+      };
     } else if (kind === 'figure' || kind === 'diagram' || kind === 'logo' || kind === 'title') {
       block.image = imageInfo(el);
       if (kind === 'figure' || kind === 'diagram') {

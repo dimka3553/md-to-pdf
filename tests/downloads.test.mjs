@@ -31,11 +31,13 @@ async function withDir(fn) {
   }
 }
 
-test('parseDownloadId accepts hex ids with or without .pdf', () => {
+test('parseDownloadId accepts hex ids with or without .pdf / .html', () => {
   const id = 'a'.repeat(32);
   assert.equal(parseDownloadId(id), id);
   assert.equal(parseDownloadId(`${id}.pdf`), id);
   assert.equal(parseDownloadId(`${id}.PDF`), id);
+  assert.equal(parseDownloadId(`${id}.html`), id);
+  assert.equal(parseDownloadId(`${id}.HTML`), id);
   assert.equal(parseDownloadId('nope'), null);
   assert.equal(parseDownloadId('../etc/passwd'), null);
   assert.equal(parseDownloadId(''), null);
@@ -59,6 +61,23 @@ test('persistDownload writes a local file and returns a /d URL', async () => {
     assert.equal(rec.mimeType, 'application/pdf');
     assert.ok(Buffer.isBuffer(rec.body));
     assert.equal(Buffer.compare(rec.body, pdfBytes), 0);
+  });
+});
+
+test('persistDownload writes HTML with a .html URL', async () => {
+  await withDir(async () => {
+    const html = Buffer.from('<html><body>Hi</body></html>');
+    const saved = await persistDownload({
+      body: html,
+      fileName: 'Probe.html',
+      origin: 'https://md.dima.ua',
+      mimeType: 'text/html',
+    });
+    assert.equal(saved.url, `https://md.dima.ua/d/${saved.id}.html`);
+    const rec = await readDownload(saved.id);
+    assert.equal(rec.mimeType, 'text/html');
+    assert.equal(rec.fileName, 'Probe.html');
+    assert.equal(Buffer.compare(rec.body, html), 0);
   });
 });
 

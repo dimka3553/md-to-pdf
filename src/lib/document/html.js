@@ -1,4 +1,4 @@
-import { CODE_FONT, LOGO_SIZES, normalizeSettings, resolveDesign } from './settings.js';
+import { CODE_FONT, LOGO_SIZES, headerLogoOf, normalizeSettings, resolveDesign } from './settings.js';
 import { markdownToHtml, extractHeadings } from './markdown.js';
 import { buildStyles } from './styles.js';
 import { preparePagination, splitOverflowingBlock, mergeSplitBlocks } from './pagination.js';
@@ -313,6 +313,8 @@ function insertAfterTitle(body, html) {
 function fontLink(design) {
   const families = new Set([design.font.google, design.headingFont.google, CODE_FONT.google]);
   const query = Array.from(families).map((f) => `family=${f}`).join('&');
+  // Preview / HTML download: WOFF2 from Google. PDF generation rewrites this
+  // to inlined TrueType (see withPrintableFonts) so copy-paste stays intact.
   return `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?${query}&display=swap">`;
 }
 
@@ -328,7 +330,7 @@ function runningContent(settings, docTitle) {
     dateText: settings.header.showDate ? formatDate() : '',
     footerText: settings.footer.text.replace(/\{title\}/gi, plainTitle),
     pageNumbers: settings.footer.pageNumbers ? settings.footer.pageNumberStyle : null,
-    headerLogo: settings.logo && settings.logo.position === 'page-header' ? settings.logo : null,
+    headerLogo: headerLogoOf(settings),
   };
 }
 

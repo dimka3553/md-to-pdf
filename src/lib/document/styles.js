@@ -87,6 +87,13 @@ export function buildStyles(design, settings, mode) {
     .sheet, .sheet-inner { position: relative; }
     /* Measure at print width before Chromium performs page fragmentation. */
     .sheet { width: ${design.pageWidth - 2 * mx}px; }
+    /* Serif/display faces map fi/fl to presentation glyphs (U+FB01) which
+       copy as "oﬃce" instead of "office". Preview can keep ligatures. */
+    html, body {
+      font-variant-ligatures: none;
+      font-feature-settings: "liga" 0, "clig" 0, "dlig" 0, "calt" 0;
+    }
+    html :is(h1, h2, h3, h4, h5, h6, .cover-title, .toc-title) { letter-spacing: 0; }
     .page-break { display: none; }
     .manual-page-start, .heading-page-start { break-before: page; page-break-before: always; }
     .cover { height: ${design.pageHeight - (my + (design.hasRunningHeader ? 30 : 0)) - (my + (design.hasRunningFooter ? 30 : 0)) - 4}px; break-after: page; page-break-after: always; }

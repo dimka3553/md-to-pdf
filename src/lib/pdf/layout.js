@@ -3,6 +3,8 @@
  * into a text layout report agents can read instead of screenshotting pages.
  */
 
+import { headerLogoOf } from '../document/settings.js';
+
 const KIND_LABEL = {
   cover: 'COVER',
   toc: 'TOC',
@@ -25,6 +27,7 @@ const KIND_LABEL = {
   diagram: 'DIAGRAM',
   hr: 'RULE',
   logo: 'LOGO',
+  footnotes: 'NOTES',
 };
 
 function norm(s) {
@@ -132,6 +135,10 @@ function describeBlock(block) {
   if (block.kind === 'callout') {
     return { label, summary: (block.callout?.type || 'note').toUpperCase(), extra: block.text };
   }
+  if (block.kind === 'footnotes') {
+    const f = block.footnotes || {};
+    return { label, summary: `${f.entries || 0} notes`, extra: (f.preview || []).slice(0, 4).join(' · ') };
+  }
   if (block.kind === 'figure' || block.kind === 'diagram' || block.kind === 'logo') {
     const img = block.image;
     const size = img ? `${img.width}×${img.height}px` : '';
@@ -153,9 +160,45 @@ function inferBreak(prevPage, page, firstBlock) {
   if (flags.headingPageStart) return `heading mode (${firstBlock.kind})`;
   if (firstBlock.kind === 'table' && firstBlock.split && firstBlock.split.from > 1) return 'table continuation';
   if (firstBlock.kind === 'code' && firstBlock.split) return 'code continuation';
+  if (firstBlock.kind === 'footnotes' || page.role === 'footnotes') return 'footnotes';
   if (prevPage.usedPct < 55 && /^h[1-6]$/.test(firstBlock.kind)) return 'keep-together (section opening did not fit)';
   if (prevPage.usedPct >= 90) return 'page full';
   return 'content overflow';
+}
+
+function fallbackYPct(page) {
+  const first = page?.body?.[0];
+  return first && Number.isFinite(first.yPct) ? first.yPct : null;
+}
+
+function blockNeedle(block) {
+  return needleOf(block.caption || block.cover?.title || block.image?.alt || block.text, 42);
+}
+
+/**
+ * Fill missing y% from neighbours in document order so unlocated blocks
+ * (figures whose image has no extractable text, continuations) stay in
+ * reading order instead of sorting to the end of the page.
+ */
+export function locateBlocks(blocks) {
+  const ys = blocks.map((b) => (Number.isFinite(b.yPct) ? b.yPct : null));
+  for (let i = 0; i < ys.length; i++) {
+    if (ys[i] != null) continue;
+    const prev = [...ys.slice(0, i)].reverse().find((y) => y != null);
+    const next = ys.slice(i + 1).find((y) => y != null);
+    if (prev != null && next != null) ys[i] = (prev + next) / 2;
+    else if (prev != null) ys[i] = Math.min(99, prev + 0.5);
+    else if (next != null) ys[i] = Math.max(0, next - 0.5);
+    else ys[i] = i + 1;
+  }
+  return blocks.map((b, i) => (b.yPct == null ? { ...b, yPct: ys[i] } : b));
+}
+
+function orderBlocks(blocks) {
+  return locateBlocks(blocks)
+    .map((b, i) => ({ b, i }))
+    .sort((a, c) => (a.b.yPct - c.b.yPct) || (a.i - c.i))
+    .map((x) => x.b);
 }
 
 function padPct(n) {
@@ -206,7 +249,7 @@ export function assignBlocksToPages(dom, printed) {
         const line = lineForNeedle(printed.pages[pi], startNeedle);
         pages[pi].blocks.push({
           ...block,
-          yPct: line ? line.yPct : null,
+          yPct: line ? line.yPct : fallbackYPct(printed.pages[pi]),
           split: byPage.size > 1 ? range : null,
         });
       }
@@ -214,9 +257,15 @@ export function assignBlocksToPages(dom, printed) {
       continue;
     }
 
-    const needle = needleOf(block.cover?.title || block.text, 42);
+    const needle = blockNeedle(block);
     let pi = findOnPages(needle, printed.pages, cursor);
     if (pi < 0 && block.kind === 'cover') pi = 0;
+    if (pi < 0 && block.kind === 'footnotes') {
+      pi = printed.pages.length - 1;
+      for (let i = printed.pages.length - 1; i >= cursor; i--) {
+        if (printed.pages[i].body?.length) { pi = i; break; }
+      }
+    }
     if (pi < 0 && (block.kind === 'figure' || block.kind === 'diagram' || block.kind === 'logo' || block.kind === 'hr')) {
       pi = Math.min(cursor, pages.length - 1);
     }
@@ -225,14 +274,20 @@ export function assignBlocksToPages(dom, printed) {
     }
     cursor = pi;
     const line = lineForNeedle(printed.pages[pi], needle);
-    pages[pi].blocks.push({ ...block, yPct: line ? line.yPct : null, split: null });
+    pages[pi].blocks.push({
+      ...block,
+      yPct: line ? line.yPct : fallbackYPct(printed.pages[pi]),
+      split: null,
+    });
   }
 
   for (const page of pages) {
+    page.blocks = locateBlocks(page.blocks);
     const kinds = page.blocks.map((b) => b.kind);
     if (kinds[0] === 'cover' && kinds.every((k) => k === 'cover')) page.role = 'cover';
     else if (kinds[0] === 'toc' && kinds.filter((k) => k !== 'toc').length === 0) page.role = 'contents';
     else if (kinds.includes('toc') && page.number === 1) page.role = 'title + contents';
+    else if (kinds.includes('footnotes') && kinds.every((k) => k === 'footnotes')) page.role = 'footnotes';
   }
 
   return pages;
@@ -263,12 +318,18 @@ export function detectLayoutIssues(pages, { title = '', settings = {}, overflow 
     const first = page.blocks[0];
 
     if (page.blocks.length === 0) {
-      issues.push({
-        severity: 'warning',
-        code: 'blank-page',
-        page: page.number,
-        message: `Page ${page.number} has no body content (blank page).`,
-      });
+      if (page.body?.length) {
+        const first = norm(page.body[0].text);
+        if (first.startsWith('footnotes') || page.role === 'footnotes') page.role = 'footnotes';
+        else page.role = page.role || 'notes';
+      } else {
+        issues.push({
+          severity: 'warning',
+          code: 'blank-page',
+          page: page.number,
+          message: `Page ${page.number} has no body content (blank page).`,
+        });
+      }
     }
 
     if (last && /^h[1-6]$/.test(last.kind) && (last.yPct == null || last.yPct >= 78)) {
@@ -366,7 +427,7 @@ export function formatLayoutReport({ printed, pages, issues, settings, design, t
   const headerDesc = [
     settings.header?.text?.trim() && `"${settings.header.text.trim()}"`,
     settings.header?.showDate && 'date',
-    settings.logo?.position === 'page-header' && 'logo',
+    headerLogoOf(settings) && 'logo',
   ].filter(Boolean);
   const footerDesc = [
     settings.footer?.text?.trim() && `"${settings.footer.text.trim()}"`,
@@ -394,8 +455,8 @@ export function formatLayoutReport({ printed, pages, issues, settings, design, t
     for (let i = 1; i < pages.length; i++) {
       const prev = pages[i - 1];
       const page = pages[i];
-        const first = [...page.blocks].sort((a, b) => (a.yPct ?? 0) - (b.yPct ?? 0))[0];
-        const lastPrev = [...prev.blocks].sort((a, b) => (a.yPct ?? 0) - (b.yPct ?? 0)).at(-1);
+        const first = orderBlocks(page.blocks)[0];
+        const lastPrev = orderBlocks(prev.blocks).at(-1);
       const why = inferBreak(prev, page, first);
       const from = lastPrev ? `${(KIND_LABEL[lastPrev.kind] || lastPrev.kind)} ${lastPrev.text ? `"${lastPrev.text.slice(0, 48)}"` : ''}`.trim() : 'end of content';
       const to = first ? `${(KIND_LABEL[first.kind] || first.kind)} ${first.text ? `"${first.text.slice(0, 48)}"` : ''}`.trim() : 'next page';
@@ -410,8 +471,11 @@ export function formatLayoutReport({ printed, pages, issues, settings, design, t
     const fill = Number.isFinite(page.usedPct) ? `${Math.round(page.usedPct)}% full` : '';
     lines.push(`PAGE ${page.number}/${printed.pageCount}${role} · ${fill}`.replace(/\s+·\s+$/, ''));
     lines.push(`  ${formatChrome('HEADER', page.header)}`);
-    const ordered = [...page.blocks].sort((a, b) => (a.yPct ?? 1e9) - (b.yPct ?? 1e9) || 0);
+    const ordered = orderBlocks(page.blocks);
     if (!ordered.length && page.body?.length) {
+      if (page.role === 'footnotes' || page.role === 'notes') {
+        lines.push(`  ${padPct(page.body[0].yPct)}%  NOTES   ${page.body.length} line${page.body.length === 1 ? '' : 's'}`);
+      }
       for (const line of page.body) {
         lines.push(`  ${padPct(line.yPct)}%  TEXT    "${line.text}"`);
       }
@@ -478,6 +542,8 @@ export function buildLayoutReport({ printed, dom, settings, design, title }) {
         callout: b.callout,
         code: b.code,
         list: b.list && { items: b.list.items },
+        footnotes: b.footnotes,
+        caption: b.caption,
         cover: b.cover && { title: b.cover.title, kicker: b.cover.kicker, subtitle: b.cover.subtitle, hasLogo: b.cover.hasLogo },
       })),
     })),
