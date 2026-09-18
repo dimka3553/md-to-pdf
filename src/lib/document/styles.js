@@ -260,7 +260,22 @@ export function buildStyles(design, settings, mode) {
     thead { display: table-header-group; }
     tr { break-inside: avoid; page-break-inside: avoid; }
     th, td { padding: .5em .75em; border: 1px solid ${t.border}; text-align: left; vertical-align: top; }
-    th { background: ${t.tableHeader}; color: ${tableHeaderText}; font-weight: 600; font-size: .92em; letter-spacing: .01em; }
+    th {
+      background: ${t.tableHeader};
+      color: ${tableHeaderText};
+      -webkit-text-fill-color: ${tableHeaderText};
+      font-weight: 600;
+      font-size: .92em;
+      letter-spacing: .01em;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    /* Bold/links otherwise take the heading colour, and Chromium's PDF pipeline
+       rewrites light text to black against the page instead of the cell. */
+    th :is(a, strong, b, em, i, del, s, mark, small) {
+      color: inherit;
+      -webkit-text-fill-color: inherit;
+    }
     table.no-header thead { display: none; }
     ${t.tableHeaderText ? `th { border-color: ${t.tableHeader}; }` : ''}
     tbody tr.alt td { background: ${t.tableStripe}; }
@@ -297,6 +312,7 @@ export function buildStyles(design, settings, mode) {
     @media print {
       body { background: ${t.background} !important; }
       a { color: ${t.link} !important; }
+      th a { color: inherit !important; -webkit-text-fill-color: inherit; }
     }
   `;
 }

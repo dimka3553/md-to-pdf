@@ -219,5 +219,30 @@ test('real Chromium pagination keeps section openings together', { timeout: 120_
         assert.equal(info.guides, 0);
       } finally { await page.close(); }
     });
+    await t.test('corporate table headers keep light text, including bold cells', async () => {
+      const md = '# Terms\n\n| **Dmytro Shkabura, CEO** | Andrej |\n| --- | --- |\n| Signature | |';
+      const page = await render(md, { theme: 'corporate' }, 'pdf');
+      try {
+        const colors = await page.evaluate(() => {
+          const ths = [...document.querySelectorAll('th')];
+          const cs = (el) => getComputedStyle(el);
+          return ths.map((th) => ({
+            color: cs(th).color,
+            fill: cs(th).webkitTextFillColor,
+            background: cs(th).backgroundColor,
+            strongColor: th.querySelector('strong') ? cs(th.querySelector('strong')).color : null,
+            strongFill: th.querySelector('strong') ? cs(th.querySelector('strong')).webkitTextFillColor : null,
+          }));
+        });
+        assert.equal(colors.length, 2);
+        for (const c of colors) {
+          assert.equal(c.color, 'rgb(255, 255, 255)');
+          assert.equal(c.fill, 'rgb(255, 255, 255)');
+          assert.equal(c.background, 'rgb(11, 42, 91)');
+        }
+        assert.equal(colors[0].strongColor, 'rgb(255, 255, 255)');
+        assert.equal(colors[0].strongFill, 'rgb(255, 255, 255)');
+      } finally { await page.close(); }
+    });
   });
 });
