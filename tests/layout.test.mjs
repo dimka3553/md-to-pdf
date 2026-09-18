@@ -1,8 +1,30 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { assignBlocksToPages, buildLayoutReport, detectLayoutIssues } from '../src/lib/pdf/layout.js';
+import { extractPdfLayout } from '../src/lib/pdf/extract.js';
 import { normalizeSettings, resolveDesign } from '../src/lib/document/settings.js';
 import { renderPdf } from '../src/lib/pdf/generate.js';
+
+function minimalPdf() {
+  const objects = [
+    '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n',
+    '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n',
+    '3 0 obj<</Type/Page/MediaBox[0 0 200 200]/Parent 2 0 R/Resources<<>>>>endobj\n',
+  ];
+  let body = '%PDF-1.1\n';
+  const offsets = [0];
+  for (const obj of objects) {
+    offsets.push(Buffer.byteLength(body));
+    body += obj;
+  }
+  const xrefStart = Buffer.byteLength(body);
+  body += 'xref\n0 4\n0000000000 65535 f \n';
+  for (let i = 1; i <= 3; i++) {
+    body += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+  }
+  body += `trailer<</Size 4/Root 1 0 R>>\nstartxref\n${xrefStart}\n%%EOF\n`;
+  return Buffer.from(body);
+}
 
 function printedPages(specs) {
   return {
@@ -18,6 +40,12 @@ function printedPages(specs) {
     })),
   };
 }
+
+test('pdf.js loads in Node without browser geometry APIs', async () => {
+  const printed = await extractPdfLayout(minimalPdf(), { pageWidth: 200, pageHeight: 200 });
+  assert.equal(printed.pageCount, 1);
+  assert.equal(printed.pages[0].body.length, 0);
+});
 
 test('layout report maps blocks onto printed pages and flags a repeating header', () => {
   const printed = printedPages([

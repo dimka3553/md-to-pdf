@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { markdownToHtml } from '../src/lib/document/markdown.js';
+import { openPdfDocument } from '../src/lib/pdf/extract.js';
 import { buildDocumentHtml } from '../src/lib/document/html.js';
 import { normalizeSettings, resolveDesign } from '../src/lib/document/settings.js';
 import { withBrowser } from '../src/lib/pdf/browser.js';
@@ -82,7 +82,7 @@ test('real Chromium pagination keeps section openings together', { timeout: 120_
       const page = await render(markdown, settings);
       try {
         const bytes = await page.pdf({ preferCSSPageSize: true, printBackground: true });
-        const pdf = await getDocument({ data: new Uint8Array(bytes), useSystemFonts: true }).promise;
+        const pdf = await openPdfDocument(bytes);
         try {
           const pages = [];
           for (let i = 1; i <= pdf.numPages; i++) {

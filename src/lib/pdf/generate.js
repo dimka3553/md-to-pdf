@@ -1,7 +1,6 @@
 import { buildDocumentHtml, buildPdfPageOptions } from '../document/html.js';
 import { resolveDesign } from '../document/settings.js';
 import { withBrowser } from './browser.js';
-import { extractPdfLayout } from './extract.js';
 import { collectDomSnapshot } from './inspect.js';
 import { buildLayoutReport } from './layout.js';
 
@@ -58,6 +57,7 @@ export async function renderPdf({ markdown, settings, assets, title, includeLayo
 
 async function describeLayout(page, pdf, { settings, design, title }) {
   try {
+    const { extractPdfLayout } = await import('./extract.js');
     const headerBandPx = design.hasRunningHeader ? Math.round(design.margins.y * 0.55) + 18 : 8;
     const footerBandPx = design.hasRunningFooter ? Math.round(design.margins.y * 0.55) + 18 : 8;
     const [printed, dom] = await Promise.all([

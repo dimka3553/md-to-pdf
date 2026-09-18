@@ -3,7 +3,36 @@
  * Used to tell agents what actually printed, without screenshots.
  */
 
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { ensurePdfJsDom } from './pdfjs-dom.js';
+
+let pdfjsModule;
+
+function loadPdfJs() {
+  if (!pdfjsModule) {
+    // Next evaluates externals independently of local imports, so the polyfill
+    // must run in this function — not as a sibling static import of pdfjs-dist.
+    ensurePdfJsDom();
+    pdfjsModule = import('pdfjs-dist/legacy/build/pdf.mjs');
+  }
+  return pdfjsModule;
+}
+
+/**
+ * @param {Buffer|Uint8Array} pdf
+ * @param {object} [options]
+ */
+export async function openPdfDocument(pdf, options = {}) {
+  const { getDocument } = await loadPdfJs();
+  const data = Buffer.isBuffer(pdf) ? new Uint8Array(pdf) : pdf instanceof Uint8Array ? pdf : new Uint8Array(pdf);
+  return getDocument({
+    data,
+    useSystemFonts: true,
+    disableFontFace: true,
+    isEvalSupported: false,
+    verbosity: 0,
+    ...options,
+  }).promise;
+}
 
 const LINE_Y_TOLERANCE = 3.2;
 
@@ -88,15 +117,7 @@ function band(yPct, headerMaxPct, footerMinPct) {
  * @param {{ pageHeight: number, pageWidth: number, headerBandPx?: number, footerBandPx?: number }} geometry
  */
 export async function extractPdfLayout(pdf, geometry) {
-  const data = Buffer.isBuffer(pdf) ? new Uint8Array(pdf) : pdf instanceof Uint8Array ? pdf : new Uint8Array(pdf);
-  const task = getDocument({
-    data,
-    useSystemFonts: true,
-    disableFontFace: true,
-    isEvalSupported: false,
-    verbosity: 0,
-  });
-  const doc = await task.promise;
+  const doc = await openPdfDocument(pdf);
   try {
     const headerMaxPct = ((geometry.headerBandPx || 0) / geometry.pageHeight) * 100 + 1.2;
     const footerMinPct = 100 - ((geometry.footerBandPx || 0) / geometry.pageHeight) * 100 - 1.2;
