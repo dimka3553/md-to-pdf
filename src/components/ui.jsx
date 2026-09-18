@@ -147,7 +147,7 @@ export function Section({ title, icon, children, defaultOpen = true, action }) {
   );
 }
 
-export function Dialog({ open, onClose, title, description, children, footer, width = 'max-w-lg' }) {
+export function Dialog({ open, onClose, title, description, children, footer, width = 'max-w-lg', bodyClassName }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -164,19 +164,35 @@ export function Dialog({ open, onClose, title, description, children, footer, wi
 
   if (!open) return null;
   return (
-    <div className="fade-in fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/40 p-4 backdrop-blur-[2px] dark:bg-black/60" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={ref} role="dialog" aria-modal="true" aria-label={title} className={cx('pop-in w-full rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900', width)}>
-        <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-          <div>
+    <div
+      className="fade-in fixed inset-0 z-[100] flex items-end justify-center overflow-hidden bg-gray-900/40 p-0 backdrop-blur-[2px] sm:items-center sm:p-4 dark:bg-black/60"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className={cx(
+          'pop-in flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl dark:border-gray-700 dark:bg-gray-900',
+          width,
+        )}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:gap-4 sm:px-5 sm:py-4 dark:border-gray-800">
+          <div className="min-w-0">
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
-            {description && <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{description}</p>}
+            {description && <p className="mt-0.5 line-clamp-2 text-sm text-gray-500 sm:line-clamp-none dark:text-gray-400">{description}</p>}
           </div>
-          <IconButton label="Close" onClick={onClose}>
+          <IconButton label="Close" onClick={onClose} className="shrink-0">
             <X />
           </IconButton>
         </div>
-        <div className="px-5 py-4">{children}</div>
-        {footer && <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-5 py-3 dark:border-gray-800">{footer}</div>}
+        <div className={cx('min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5', bodyClassName)}>{children}</div>
+        {footer && (
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-gray-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5 dark:border-gray-800">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

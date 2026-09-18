@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import * as I from '../icons';
 import { Button, Dialog, cx } from '../ui';
 import { useToast } from '../Toast';
@@ -12,14 +12,14 @@ function CodeBox({ label, value, onCopy, mono = true }) {
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/70">
       {label && (
-        <div className="flex items-center justify-between border-b border-gray-200 px-3 py-1.5 text-[11px] text-gray-500 dark:border-gray-700 dark:text-gray-400">
-          <span className="truncate">{label}</span>
-          <button type="button" onClick={() => onCopy(value)} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-white hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-gray-100">
+        <div className="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-1.5 text-[11px] text-gray-500 dark:border-gray-700 dark:text-gray-400">
+          <span className="min-w-0 truncate">{label}</span>
+          <button type="button" onClick={() => onCopy(value)} className="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 hover:bg-white hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-gray-100">
             <I.Copy className="h-3 w-3" /> Copy
           </button>
         </div>
       )}
-      <pre className={cx('max-h-40 overflow-auto px-3 py-2 text-xs leading-relaxed text-gray-800 dark:text-gray-100', mono && 'font-mono')}>{value}</pre>
+      <pre className={cx('max-h-40 overflow-auto px-3 py-2 text-xs leading-relaxed break-all whitespace-pre-wrap text-gray-800 dark:text-gray-100', mono && 'font-mono')}>{value}</pre>
     </div>
   );
 }
@@ -43,11 +43,11 @@ function Details({ agent, plan, url, launched, onLaunch, onCopy }) {
   const kindLabel = plan.kind === 'deeplink' ? 'One-click' : plan.kind === 'cli' ? 'Terminal' : 'Manual';
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div className="flex h-full min-w-0 flex-col gap-3">
       <div className="flex items-center gap-3">
         <AgentBadge agent={agent} />
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{agent.name}</h3>
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">{kindLabel}</span>
           </div>
@@ -67,8 +67,10 @@ function Details({ agent, plan, url, launched, onLaunch, onCopy }) {
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button variant="primary" size="sm" onClick={onLaunch}>
-              <I.ExternalLink className="h-3.5 w-3.5" /> {launched ? `Open ${agent.name} again` : `Open in ${agent.name}`}
+            <Button variant="primary" size="sm" onClick={onLaunch} className="h-auto min-h-8 max-w-full whitespace-normal py-1.5 text-center">
+              <I.ExternalLink className="h-3.5 w-3.5 shrink-0" />
+              <span className="sm:hidden">{launched ? 'Open again' : `Open ${agent.name}`}</span>
+              <span className="hidden sm:inline">{launched ? `Open ${agent.name} again` : `Open in ${agent.name}`}</span>
             </Button>
             {plan.webHref && (
               <a href={plan.webHref} target="_blank" rel="noreferrer" className="text-xs text-brand-700 underline-offset-2 hover:underline dark:text-brand-300">
@@ -104,7 +106,7 @@ function Details({ agent, plan, url, launched, onLaunch, onCopy }) {
         </div>
       )}
 
-      <div className="mt-auto rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400">
+      <div className="mt-auto rounded-lg border border-dashed border-gray-200 p-3 text-xs leading-relaxed text-gray-500 dark:border-gray-700 dark:text-gray-400">
         Once connected, just ask your agent: <em className="text-gray-700 dark:text-gray-200">&ldquo;Write a project proposal and export it as a PDF with Markdown Studio.&rdquo;</em> It reads the authoring guide, lints the Markdown and renders the PDF on its own.
         <span className="sr-only">{url}</span>
       </div>
@@ -131,6 +133,7 @@ export function AddToAgentDialog({ open, onClose }) {
   const [selectedId, setSelectedId] = useState(readLastAgent);
   const [launched, setLaunched] = useState(false);
   const [origin] = useState(() => (isBrowser ? window.location.origin : ''));
+  const detailsRef = useRef(null);
 
   const close = useCallback(() => {
     setLaunched(false);
@@ -170,6 +173,9 @@ export function AddToAgentDialog({ open, onClose }) {
     }
     const p = a.install(url);
     if (p.kind === 'deeplink') launch(p);
+    else if (isBrowser && window.matchMedia('(max-width: 767px)').matches) {
+      requestAnimationFrame(() => detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
   };
 
   return (
@@ -179,58 +185,69 @@ export function AddToAgentDialog({ open, onClose }) {
       title="Add to AI agent"
       description="Connect the Markdown Studio MCP server so your coding agent writes better-formatted Markdown and exports PDFs — free, no sign-up."
       width="max-w-3xl"
+      bodyClassName="flex flex-col"
       footer={
         <>
-          <a href="https://github.com/dimka3553/md-to-pdf#for-ai-agents-mcp" target="_blank" rel="noreferrer" className="mr-auto inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
-            <I.Book className="h-3.5 w-3.5" /> Docs &amp; plugin install
+          <a href="https://github.com/dimka3553/md-to-pdf#for-ai-agents-mcp" target="_blank" rel="noreferrer" className="mr-auto inline-flex max-w-full items-center gap-1 text-xs text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
+            <I.Book className="h-3.5 w-3.5 shrink-0" /> Docs &amp; plugin install
           </a>
           <Button variant="primary" onClick={close}>Done</Button>
         </>
       }
     >
-      <div className="mb-3 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-800/70">
+      <div className="mb-3 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 sm:px-3 dark:border-gray-700 dark:bg-gray-800/70">
         <I.Plug className="h-4 w-4 shrink-0 text-gray-400" />
-        <code className="min-w-0 flex-1 truncate font-mono text-xs text-gray-800 dark:text-gray-100" title={url}>{url}</code>
-        <Button size="sm" onClick={() => copy(url)}>
-          <I.Copy className="h-3.5 w-3.5" /> Copy URL
+        <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-gray-800 sm:text-xs dark:text-gray-100" title={url}>{url}</code>
+        <Button size="sm" onClick={() => copy(url)} className="shrink-0 px-2 sm:px-2.5">
+          <I.Copy className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Copy URL</span>
+          <span className="sm:hidden">Copy</span>
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
-        <ul className="flex max-h-[52vh] flex-col gap-1 overflow-y-auto pr-1 sm:max-h-[420px]" role="listbox" aria-label="AI agents">
+      <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[minmax(12.5rem,15rem)_minmax(0,1fr)]">
+        <ul
+          className="grid grid-cols-2 content-start gap-1 md:sticky md:top-0 md:grid-cols-1 md:max-h-[min(28rem,calc(100dvh-16rem))] md:overflow-y-auto md:pr-1"
+          role="listbox"
+          aria-label="AI agents"
+        >
           {AGENTS.map((a) => {
             const active = a.id === selectedId;
+            const kind = a.install(url).kind;
             return (
-              <li key={a.id}>
+              <li key={a.id} className="min-w-0">
                 <button
                   type="button"
                   role="option"
                   aria-selected={active}
                   onClick={() => pick(a)}
                   className={cx(
-                    'flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60',
+                    'flex w-full min-w-0 items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 md:gap-2.5 md:px-2.5 md:py-2',
                     active ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-900/20' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-800/60',
                   )}
                 >
                   <AgentBadge agent={a} size="sm" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-gray-900 dark:text-gray-100">{a.name}</span>
-                    <span className="block truncate text-[11px] text-gray-500 dark:text-gray-400">{a.tagline}</span>
+                    <span className="hidden truncate text-[11px] text-gray-500 md:block dark:text-gray-400">{a.tagline}</span>
                   </span>
-                  {a.install(url).kind === 'deeplink' ? <I.ExternalLink className="h-3.5 w-3.5 shrink-0 text-gray-400" /> : a.install(url).kind === 'cli' ? <I.Terminal className="h-3.5 w-3.5 shrink-0 text-gray-400" /> : null}
+                  {kind === 'deeplink' ? <I.ExternalLink className="hidden h-3.5 w-3.5 shrink-0 text-gray-400 md:block" /> : kind === 'cli' ? <I.Terminal className="hidden h-3.5 w-3.5 shrink-0 text-gray-400 md:block" /> : null}
                 </button>
               </li>
             );
           })}
         </ul>
 
-        <div className="min-h-[260px] rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+        <div ref={detailsRef} className="min-h-0 min-w-0 scroll-mt-2 rounded-xl border border-gray-200 p-3 md:min-h-[260px] md:p-4 dark:border-gray-700">
           {agent && plan ? (
             <Details key={agent.id} agent={agent} plan={plan} url={url} launched={launched} onLaunch={() => launch(plan)} onCopy={copy} />
           ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-2 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+            <div className="flex h-full flex-col items-center justify-center gap-2 px-2 py-8 text-center text-sm text-gray-500 md:py-10 dark:text-gray-400">
               <I.Bot className="h-8 w-8 text-gray-300 dark:text-gray-600" />
-              <p>Pick your agent on the left.</p>
+              <p>
+                Pick your agent <span className="md:hidden">above</span>
+                <span className="hidden md:inline">on the left</span>.
+              </p>
               <p className="max-w-xs text-xs">Cursor, VS Code and Goose install with one click; the others take a single command or a pasted snippet.</p>
             </div>
           )}

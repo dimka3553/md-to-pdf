@@ -57,7 +57,7 @@ export function ImportUrlDialog({ open, onClose, onImport }) {
     >
       <form onSubmit={submit} className="space-y-3">
         <Input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/article" autoFocus disabled={loading} aria-label="URL" />
-        <div className="flex gap-4 text-sm">
+        <div className="flex flex-col gap-2 text-sm sm:flex-row sm:gap-4">
           <label className="flex items-center gap-2"><input type="radio" checked={replace} onChange={() => setReplace(true)} className="accent-brand-600" /> Replace document</label>
           <label className="flex items-center gap-2"><input type="radio" checked={!replace} onChange={() => setReplace(false)} className="accent-brand-600" /> Append to end</label>
         </div>
@@ -83,7 +83,7 @@ export function TemplatesDialog({ open, onClose, onPick, dirty }) {
         </>
       }
     >
-      <div className="grid max-h-[60vh] grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
+      <div className="grid max-h-[min(60vh,calc(100dvh-14rem))] grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
         {TEMPLATES.map((t) => (
           <button
             key={t.id}
@@ -167,14 +167,14 @@ export function ImagesDialog({ open, onClose, assets, onInsert, onRemove, onUplo
       {entries.length === 0 ? (
         <p className="py-6 text-center text-sm text-gray-500">No images yet. Upload one, or paste / drop an image into the editor.</p>
       ) : (
-        <ul className="grid max-h-[50vh] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
+        <ul className="grid max-h-[min(50vh,calc(100dvh-14rem))] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
           {entries.map(([name, dataUrl]) => (
             <li key={name} className="group relative overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
               <div className="checker flex h-24 items-center justify-center">
                 <img src={dataUrl} alt={name} className="max-h-24 max-w-full object-contain" />
               </div>
               <div className="truncate px-2 py-1 text-[11px] text-gray-600 dark:text-gray-300" title={name}>{name}</div>
-              <div className="absolute inset-x-0 bottom-6 flex justify-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="absolute inset-x-0 bottom-6 flex justify-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                 <Button size="sm" variant="primary" onClick={() => { onInsert(name); onClose(); }}>Insert</Button>
                 <Button size="sm" variant="danger" onClick={() => onRemove(name)} aria-label={`Remove ${name}`}><I.Trash className="h-3.5 w-3.5" /></Button>
               </div>

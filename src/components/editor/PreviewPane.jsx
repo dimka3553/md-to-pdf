@@ -95,7 +95,7 @@ export default function PreviewPane({ markdown, settings, assets, fileName, pdf,
               { value: 'pdf', label: 'PDF', icon: <I.FilePdf className="h-3.5 w-3.5" />, title: 'Render the actual PDF file' },
             ]}
           />
-          <span className="hidden text-xs text-gray-500 sm:inline dark:text-gray-400">
+          <span className="hidden text-xs text-gray-500 md:inline dark:text-gray-400">
             {mode === 'live' ? `${pages} page${pages === 1 ? "" : "s"} · ${design.pageWidth > design.pageHeight ? 'landscape' : 'portrait'} ${settings.paperSize}` : pdf.pages ? `${pdf.pages} page${pdf.pages === 1 ? '' : 's'}` : ''}
           </span>
         </div>
@@ -110,9 +110,9 @@ export default function PreviewPane({ markdown, settings, assets, fileName, pdf,
             </>
           ) : (
             <>
-              <Button size="sm" variant={stale ? 'primary' : 'secondary'} onClick={onRenderPdf} disabled={pdf.loading}>
+              <Button size="sm" variant={stale ? 'primary' : 'secondary'} onClick={onRenderPdf} disabled={pdf.loading} className="px-2 sm:px-2.5">
                 {pdf.loading ? <I.Spinner className="h-3.5 w-3.5" /> : <I.Refresh className="h-3.5 w-3.5" />}
-                {pdf.loading ? 'Rendering…' : stale ? 'Re-render' : 'Refresh'}
+                <span className="hidden min-[400px]:inline">{pdf.loading ? 'Rendering…' : stale ? 'Re-render' : 'Refresh'}</span>
               </Button>
               <Button size="sm" variant="ghost" onClick={onDownloadPdf} disabled={!pdf.url || pdf.loading} title="Download this PDF">
                 <I.Download className="h-3.5 w-3.5" />

@@ -89,7 +89,7 @@ function ProgressCard({ url, onCancel }) {
       <div className="h-1 w-full overflow-hidden bg-gray-100 dark:bg-gray-800">
         <div className="progress-bar h-full w-1/3 rounded-full bg-brand-500" />
       </div>
-      <div className="flex items-center gap-4 px-5 py-4">
+      <div className="flex items-center gap-3 px-4 py-4 sm:gap-4 sm:px-5">
         <I.Spinner className="h-5 w-5 text-brand-600" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{STEPS[step]}</p>
@@ -168,7 +168,7 @@ function ResultCard({ result, format, onOpen, onCopy, onDownload }) {
 
   return (
     <Card className="mt-6 overflow-hidden">
-      <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+      <div className="flex flex-col gap-2 border-b border-gray-100 px-4 py-4 sm:px-5 dark:border-gray-800">
         <div className="flex items-start gap-3">
           <HostBadge url={page.url} />
           <div className="min-w-0 flex-1">
@@ -228,13 +228,13 @@ function ResultCard({ result, format, onOpen, onCopy, onDownload }) {
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-5 py-2 dark:border-gray-800">
-        <Segmented size="sm" value={tab} onChange={setTab} options={tabs} />
-        <span className="font-mono text-[11px] text-gray-400">{lines.toLocaleString()} lines · {page.content.length.toLocaleString()} chars</span>
+      <div className="flex flex-col gap-2 border-b border-gray-100 px-4 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-gray-800">
+        <Segmented size="sm" value={tab} onChange={setTab} options={tabs} className="max-w-full overflow-x-auto" />
+        <span className="hidden font-mono text-[11px] text-gray-400 sm:inline">{lines.toLocaleString()} lines · {page.content.length.toLocaleString()} chars</span>
       </div>
 
       {tab === 'source' && (
-        <pre className="max-h-[60vh] overflow-auto p-5 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap text-gray-800 dark:text-gray-200">{page.content}</pre>
+        <pre className="max-h-[60vh] overflow-auto p-4 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap text-gray-800 sm:p-5 dark:text-gray-200">{page.content}</pre>
       )}
       {tab === 'outline' && report && <Outline outline={report.outline} />}
       {tab === 'notes' && report && <Notes warnings={report.warnings} />}
@@ -394,26 +394,28 @@ function Scraper() {
   };
 
   return (
-    <div className="h-screen overflow-y-auto bg-gray-50 dark:bg-gray-950">
+    <div className="h-dvh overflow-y-auto bg-gray-50 dark:bg-gray-950">
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white/90 backdrop-blur dark:border-gray-800 dark:bg-gray-900/90">
-        <div className="mx-auto flex h-12 max-w-4xl items-center justify-between px-4">
-          <nav className="flex items-center gap-2 text-sm" aria-label="Breadcrumb">
-            <Link href="/" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
-              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-600 text-[11px] font-black text-white">M↓</span>
-              <span className="font-semibold">Markdown Studio</span>
+        <div className="mx-auto flex h-12 max-w-4xl items-center justify-between gap-2 px-4">
+          <nav className="flex min-w-0 items-center gap-2 text-sm" aria-label="Breadcrumb">
+            <Link href="/" className="flex min-w-0 items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-600 text-[11px] font-black text-white">M↓</span>
+              <span className="hidden font-semibold sm:inline">Markdown Studio</span>
             </Link>
-            <I.ChevronRight className="h-3.5 w-3.5 text-gray-300" />
-            <span className="text-gray-900 dark:text-gray-100">Import from URL</span>
+            <I.ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-gray-300 sm:block" />
+            <span className="truncate text-gray-900 dark:text-gray-100">Import from URL</span>
           </nav>
-          <Link href="/" className="inline-flex items-center gap-1 text-sm text-brand-600 hover:underline">
-            Back to editor <I.ArrowRight className="h-3.5 w-3.5" />
+          <Link href="/" className="inline-flex shrink-0 items-center gap-1 text-sm text-brand-600 hover:underline">
+            <span className="hidden sm:inline">Back to editor</span>
+            <span className="sm:hidden">Editor</span>
+            <I.ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-10">
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:py-10">
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Turn any web page into Markdown</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-gray-900 sm:text-2xl dark:text-gray-100">Turn any web page into Markdown</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
             Paste a link. A headless browser loads the page, strips navigation, ads and scripts, keeps the article and hands you clean Markdown — ready to polish and export as a PDF.
           </p>
@@ -477,7 +479,7 @@ function Scraper() {
             </div>
 
             {error && (
-              <div role="alert" className="mt-3 flex items-start gap-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/60 dark:text-red-300">
+              <div role="alert" className="mt-3 flex flex-col items-start gap-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 sm:flex-row dark:bg-red-950/60 dark:text-red-300">
                 <I.AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p>{error}</p>

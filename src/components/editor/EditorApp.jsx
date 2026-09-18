@@ -402,7 +402,7 @@ function Editor() {
 
   return (
     <div
-      className="flex h-screen flex-col overflow-hidden"
+      className="flex h-dvh flex-col overflow-hidden"
       onDragOver={(e) => { e.preventDefault(); if (!dragging) setDragging(true); }}
       onDragLeave={(e) => { if (e.currentTarget.contains(e.relatedTarget)) return; setDragging(false); }}
       onDrop={(e) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files); }}
@@ -492,8 +492,8 @@ function Editor() {
         )}
       </div>
 
-      <footer className="flex h-7 shrink-0 items-center justify-between gap-4 border-t border-gray-200 bg-white px-3 text-[11px] text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
-        <div className="flex items-center gap-3 tabular-nums">
+      <footer className="flex h-7 shrink-0 items-center justify-between gap-2 overflow-hidden border-t border-gray-200 bg-white px-2 text-[11px] text-gray-500 sm:gap-4 sm:px-3 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+        <div className="flex min-w-0 items-center gap-2 tabular-nums sm:gap-3">
           <span>{stats.words.toLocaleString()} words</span>
           <span className="hidden sm:inline">{stats.chars.toLocaleString()} characters</span>
           <span className="hidden sm:inline">~{stats.minutes} min read</span>
@@ -510,7 +510,8 @@ function Editor() {
             <I.Globe className="h-3 w-3" /> Import from URL
           </a>
           <button type="button" onClick={() => setDialog('shortcuts')} className="inline-flex items-center gap-1 hover:text-gray-800 dark:hover:text-gray-200">
-            <I.Keyboard className="h-3 w-3" /> Shortcuts
+            <I.Keyboard className="h-3 w-3" />
+            <span className="hidden sm:inline">Shortcuts</span>
           </button>
         </div>
       </footer>

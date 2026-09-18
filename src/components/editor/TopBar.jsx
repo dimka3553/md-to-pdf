@@ -40,7 +40,7 @@ function FileMenu({ actions, isMac }) {
         File <I.ChevronDown className="h-3.5 w-3.5 opacity-60" />
       </Button>
       {open && (
-        <div role="menu" className="pop-in absolute top-full left-0 z-50 mt-1 w-60 rounded-lg border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+        <div role="menu" className="pop-in absolute top-full left-0 z-50 mt-1 w-60 max-w-[calc(100vw-1rem)] rounded-lg border border-gray-200 bg-white p-1 shadow-xl dark:border-gray-700 dark:bg-gray-900">
           <Item icon={<I.Sparkles className="h-4 w-4" />} label="New from template…" onClick={actions.templates} />
           <Item icon={<I.Upload className="h-4 w-4" />} label="Open Markdown file…" shortcut={`${mod}O`} onClick={actions.open} />
           <Item icon={<I.Globe className="h-4 w-4" />} label="Import from URL…" onClick={actions.importUrl} />
@@ -76,7 +76,7 @@ function FileName({ value, onChange }) {
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
-        className="h-7 w-48 rounded-md border border-brand-400 bg-white px-2 text-sm text-gray-900 outline-none ring-2 ring-brand-500/30 dark:bg-gray-800 dark:text-gray-100"
+        className="h-7 w-36 max-w-[40vw] rounded-md border border-brand-400 bg-white px-2 text-sm text-gray-900 outline-none ring-2 ring-brand-500/30 sm:w-48 dark:bg-gray-800 dark:text-gray-100"
         aria-label="File name"
       />
     );
@@ -91,8 +91,8 @@ function FileName({ value, onChange }) {
 
 export default function TopBar({ fileName, onFileNameChange, actions, viewMode, onViewModeChange, panelOpen, onTogglePanel, uiDark, onToggleUiTheme, exporting, saved, isMac, compact }) {
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-2 dark:border-gray-800 dark:bg-gray-900 sm:px-3">
-      <div className="flex min-w-0 items-center gap-1">
+    <header className="flex h-12 shrink-0 items-center justify-between gap-1 overflow-x-auto border-b border-gray-200 bg-white px-1.5 [scrollbar-width:none] dark:border-gray-800 dark:bg-gray-900 sm:gap-2 sm:px-3 [&::-webkit-scrollbar]:hidden">
+      <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
         <Link href="/" className="mr-1 flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Markdown Studio">
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-600 text-[11px] font-black text-white">M↓</span>
           <span className="hidden text-sm font-semibold text-gray-900 lg:inline dark:text-gray-100">Markdown Studio</span>
@@ -107,7 +107,7 @@ export default function TopBar({ fileName, onFileNameChange, actions, viewMode, 
         </span>
       </div>
 
-      <div className="flex items-center gap-1 sm:gap-2">
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
         <IconButton label={panelOpen ? 'Hide design panel (⌘⇧D)' : 'Show design panel (⌘⇧D)'} active={panelOpen} onClick={onTogglePanel}>
           <I.Palette />
         </IconButton>
@@ -131,9 +131,9 @@ export default function TopBar({ fileName, onFileNameChange, actions, viewMode, 
         <IconButton label={uiDark ? 'Switch to light interface' : 'Switch to dark interface'} onClick={onToggleUiTheme}>
           {uiDark ? <I.Sun /> : <I.Moon />}
         </IconButton>
-        <Button variant="secondary" size="sm" onClick={actions.addToAgent} className="ml-1" title="Connect the Markdown Studio MCP server to Cursor, Claude, VS Code, Codex and more">
+        <Button variant="secondary" size="sm" onClick={actions.addToAgent} className="ml-0.5 px-2 sm:ml-1 sm:px-2.5" title="Connect the Markdown Studio MCP server to Cursor, Claude, VS Code, Codex and more">
           <I.Bot className="h-3.5 w-3.5" />
-          <span className="hidden md:inline">Add to AI agent</span>
+          <span className="hidden lg:inline">Add to AI agent</span>
         </Button>
         <Button variant="primary" size="sm" onClick={actions.exportPdf} disabled={exporting}>
           {exporting ? <I.Spinner className="h-3.5 w-3.5" /> : <I.Download className="h-3.5 w-3.5" />}
