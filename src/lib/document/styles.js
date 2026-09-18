@@ -63,31 +63,20 @@ export function buildStyles(design, settings, mode) {
     .running-brand { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
     .running img { height: 16px; width: auto; display: block; flex-shrink: 0; }
     .running .hint { font-size: 7pt; opacity: .55; font-style: italic; }
-    /* A block that flows across pages (long table/list): dashed line where the PDF will split it. */
-    .page-guide {
-      position: absolute; left: -${mx}px; right: -${mx}px; height: 0;
-      border-top: 1px dashed rgba(${accentRgb}, .45);
-      pointer-events: none; z-index: 2;
-    }
-    .page-guide::after {
-      content: attr(data-label);
-      position: absolute; right: 10px; top: -9px;
-      font: 500 9px/1 system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase;
-      color: rgba(${accentRgb}, .8); background: ${t.background}; padding: 2px 6px; border-radius: 4px;
-    }
     /* Gap between two simulated pages: end of page, gutter, start of next page. */
     .page-gap {
       position: relative; margin: 0 -${mx}px; pointer-events: none; z-index: 2;
     }
     .page-gap::before {
-      content: ''; position: absolute; left: 0; right: 0; top: calc(var(--fill, 0px) + ${design.hasRunningFooter ? my + 30 : my}px); height: 28px;
-      background: rgba(100, 116, 139, .16);
-      box-shadow: inset 0 6px 6px -6px rgba(0, 0, 0, .28), inset 0 -6px 6px -6px rgba(0, 0, 0, .28);
+      content: ''; position: absolute; left: 0; right: 0; top: calc(var(--fill, 0px) + ${design.hasRunningFooter ? my + 30 : my}px); height: 36px;
+      background: ${t.dark ? 'rgba(2, 6, 23, .92)' : 'rgba(148, 163, 184, .38)'};
+      box-shadow: inset 0 8px 10px -8px rgba(0, 0, 0, .3), inset 0 -8px 10px -8px rgba(0, 0, 0, .22);
     }
-    .page-gap.manual::after {
-      content: 'manual page break'; position: absolute; left: 50%; transform: translateX(-50%);
-      top: calc(var(--fill, 0px) + ${design.hasRunningFooter ? my + 30 : my}px + 9px);
-      font: 500 9px/1 system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: rgba(100, 116, 139, .9);
+    .page-gap::after {
+      content: attr(data-label); position: absolute; left: 50%; transform: translateX(-50%);
+      top: calc(var(--fill, 0px) + ${design.hasRunningFooter ? my + 30 : my}px + 13px);
+      font: 600 9px/1 system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase;
+      color: ${t.dark ? 'rgba(226, 232, 240, .75)' : 'rgba(51, 65, 85, .8)'};
     }
     .page-break { height: 0; margin: 0; border: 0; }
     .cover { height: ${design.pageHeight - (my + (design.hasRunningHeader ? 30 : 0)) - (my + (design.hasRunningFooter ? 30 : 0))}px; margin-bottom: 0; }
@@ -272,8 +261,9 @@ export function buildStyles(design, settings, mode) {
     tr { break-inside: avoid; page-break-inside: avoid; }
     th, td { padding: .5em .75em; border: 1px solid ${t.border}; text-align: left; vertical-align: top; }
     th { background: ${t.tableHeader}; color: ${tableHeaderText}; font-weight: 600; font-size: .92em; letter-spacing: .01em; }
+    table.no-header thead { display: none; }
     ${t.tableHeaderText ? `th { border-color: ${t.tableHeader}; }` : ''}
-    tbody tr:nth-child(even) td { background: ${t.tableStripe}; }
+    tbody tr.alt td { background: ${t.tableStripe}; }
     td code { font-size: .82em; }
     table[data-cols="2"] td:first-child { width: 32%; }
 

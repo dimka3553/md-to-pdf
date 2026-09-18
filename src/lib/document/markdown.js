@@ -5,6 +5,7 @@ import GithubSlugger from 'github-slugger';
 import hljs from 'highlight.js/lib/common';
 import twemoji from 'twemoji';
 import { escapeHtml } from './utils.js';
+import { hasNewpageIal, PAGE_BREAK_BLOCK_RE, rewriteNewpageIals, stripNewpageIal } from './pageBreaks.js';
 
 const LANG_ALIASES = {
   js: 'javascript',
@@ -72,6 +73,13 @@ function parseInfo(info) {
   return { lang: lang.toLowerCase(), title };
 }
 
+function isBlankTableHeader(header) {
+  return (header || []).every((cell) => {
+    if (String(cell?.text || '').replace(/&nbsp;/gi, ' ').trim()) return false;
+    return !(cell.tokens || []).some((t) => t.type === 'image' || (t.type === 'html' && /<img\b/i.test(t.text || t.raw || '')));
+  });
+}
+
 /**
  * Build a Marked instance. A fresh instance per document keeps heading-id
  * slugs and footnote counters isolated between renders.
@@ -97,7 +105,7 @@ export function createParser(opts = {}) {
       name: 'pageBreak',
       level: 'block',
       tokenizer(src) {
-        const match = /^(?: {0,3})(?:\\(?:pagebreak|newpage)|<!--\s*(?:pagebreak|page-break|newpage)\s*-->|---pagebreak---)[\t ]*(?:\n[\t ]*\n|\n?$)/i.exec(src);
+        const match = PAGE_BREAK_BLOCK_RE.exec(src);
         if (match) return { type: 'pageBreak', raw: match[0] };
       },
       renderer() { return '<div class="page-break"></div>\n'; },
@@ -122,7 +130,9 @@ export function createParser(opts = {}) {
       },
 
       heading({ tokens, depth }) {
-        const inner = this.parser.parseInline(tokens);
+        let inner = this.parser.parseInline(tokens);
+        const newpage = hasNewpageIal(inner.replace(/<[^>]+>/g, ''));
+        if (newpage) inner = stripNewpageIal(inner);
         const plain = inner.replace(/<[^>]+>/g, '').replace(/&(amp|lt|gt|quot|#39|#039);/g, (m, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", '#039': "'" })[e]);
         const id = slugger.slug(plain.trim().toLowerCase()) || `section-${depth}`;
         let prefix = '';
@@ -131,7 +141,8 @@ export function createParser(opts = {}) {
           for (let i = depth; i < counters.length; i++) counters[i] = 0;
           prefix = `<span class="heading-number">${counters.slice(0, depth).join('.')}</span> `;
         }
-        return `<h${depth} id="${escapeHtml(id)}">${prefix}${inner}</h${depth}>\n`;
+        const marker = newpage ? '<div class="page-break"></div>\n' : '';
+        return `${marker}<h${depth} id="${escapeHtml(id)}">${prefix}${inner}</h${depth}>\n`;
       },
 
       image({ href, title, text }) {
@@ -168,17 +179,22 @@ export function createParser(opts = {}) {
       },
 
       table(token) {
+        const blankHeader = isBlankTableHeader(token.header);
         let header = '';
-        for (const cell of token.header) header += this.tablecell(cell);
-        header = `<tr>${header}</tr>`;
+        if (!blankHeader) {
+          for (const cell of token.header) header += this.tablecell(cell);
+          header = `<thead><tr>${header}</tr></thead>`;
+        }
         let body = '';
-        for (const row of token.rows) {
+        token.rows.forEach((row, i) => {
           let cells = '';
           for (const cell of row) cells += this.tablecell(cell);
-          body += `<tr>${cells}</tr>`;
-        }
+          body += `<tr${i % 2 === 1 ? ' class="alt"' : ''}>${cells}</tr>`;
+        });
         const cols = token.header.length;
-        return `<div class="table-wrap"><table data-cols="${cols}"><thead>${header}</thead>${body ? `<tbody>${body}</tbody>` : ''}</table></div>\n`;
+        return `<div class="table-wrap"><table data-cols="${cols}"${blankHeader ? ' class="no-header"' : ''}>${header}${
+          body ? `<tbody>${body}</tbody>` : ''
+        }</table></div>\n`;
       },
 
       paragraph({ tokens }) {
@@ -203,7 +219,7 @@ export function createParser(opts = {}) {
  */
 export function markdownToHtml(markdown, opts = {}) {
   const parser = createParser(opts);
-  let html = parser.parse(markdown || '', { async: false });
+  let html = parser.parse(rewriteNewpageIals(markdown || ''), { async: false });
 
   if (opts.emoji !== false) {
     html = twemoji.parse(html, {

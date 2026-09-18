@@ -22,6 +22,7 @@ import { describeScrapeError, sanitizeUrl, scrapePage, validateUrl } from '../sc
 import { analyzeMarkdown } from './analyze.js';
 import { ARGUMENT_CATALOG, FIELD_HELP, TEMPLATE_IDS } from './arguments.js';
 import { GUIDE_VERSION, MARKDOWN_GUIDE } from './guide.js';
+import { persistDownload } from '../downloads.js';
 import { SITE_URL } from '../site.js';
 
 export const SERVER_INFO = { name: 'markdown-studio', version: GUIDE_VERSION };
@@ -34,9 +35,9 @@ Recommended flow:
 1. Call get_markdown_guide once per session and follow it — it lists which syntax renders (no LaTeX, no HTML layouts, no YAML front-matter) and every tool/settings argument.
 2. Optionally call list_templates / get_template for a proven structure and matching design settings.
 3. Agree settings with the user (or apply the matching recipe if they want you to decide).
-4. Write the Markdown, then call analyze_markdown and fix every warning. Default to automatic pagination; for deliberate section boundaries put \\pagebreak on its own paragraph BEFORE the heading, never between its introduction and table. See the guide's Page breaks rules.
-5. Call render_pdf (PDF as a base64 resource) or render_html. Inspect PDF page transitions and re-render with explicit breaks where needed; analyze_markdown cannot assess physical page layout.
-6. Immediately save the PDF and open it for the user inside the client's own inline surface (in Cursor: a canvas embedding the PDF) — never in an external viewer or browser, and without asking first. Details under "After rendering" below.
+4. Write the Markdown, then call analyze_markdown and fix every warning. Default to automatic pagination; for deliberate section boundaries put \\pagebreak on its own paragraph BEFORE the heading (or \`{: .newpage }\` on the heading), never between its introduction and table. Do not put \`---\` above headings — H2s already have a rule. See the guide's Page breaks rules.
+5. Call render_pdf (returns a 24-hour download URL in the text, not a base64 PDF) or render_html. Inspect PDF page transitions and re-render with explicit breaks where needed; analyze_markdown cannot assess physical page layout.
+6. Immediately give the user that download URL (markdown link). In Cursor, also open it in a canvas whose iframe src is the URL. Details under "After rendering" below.
 All tools are stateless; pass the full markdown each time.
 
 When the source is a web page (an article, docs page, blog post, changelog…), call import_web_page with the URL first: it loads the page in a headless browser, strips navigation/ads and returns clean Markdown plus an analysis. Then polish that Markdown (fix the warnings) and render it — do not re-type page content from memory.
@@ -155,7 +156,7 @@ function designOptions() {
     runningHeader: { logoPosition: 'page-header', logoHeightPx: 14, logoMaxWidthPx: 160, logoTextGapPx: 8, alignment: 'vertically centered', condition: 'Set logo.dataUrl and logo.position="page-header" for a header logo; add header.text for accompanying text. Either may be used alone; the gap is added only when both are present. Set logo.aspect to image width / height.' },
     logoSizes: map(LOGO_SIZES, (l) => ({ name: l.name, heightPx: l.px })),
     placeholders: { '{title}': 'Replaced with the document title in header.text / footer.text' },
-    pageBreakDirective: '\\pagebreak on its own line (or <!-- pagebreak -->)',
+    pageBreakDirective: '\\pagebreak on its own line, or {: .newpage } on a heading',
     imageSizeHint: '![alt](url =WIDTHxHEIGHT) — either dimension may be omitted, e.g. =300x',
   };
 }
@@ -301,7 +302,7 @@ export function registerMarkdownStudio(server) {
     {
       title: 'Render PDF',
       description:
-        'Render Markdown + settings to a PDF with headless Chromium (takes 3–15 s). Arguments: markdown (required), settings (optional design object — every field is documented on the schema and in get_markdown_guide), assets (optional image data URLs), fileName (optional, no extension). The PDF is returned as a base64 `application/pdf` embedded resource — decode it and write it to disk (e.g. `base64 -d`). If you have shell access and want to skip base64, POST {"markdown","settings","assets","fileName"} to /api/convert on the same host and save the response body. Run analyze_markdown first and fix its warnings. As soon as this tool returns, save the file and open the PDF for the user inside the client\'s own inline surface (Cursor: a canvas with an <iframe> whose src is the data:application/pdf;base64 blob) — automatically, never in a system viewer or browser, and without asking. Then confirm or report the settings you used.',
+        'Render Markdown + settings to a PDF with headless Chromium (takes 3–15 s). Arguments: markdown (required), settings (optional design object — every field is documented on the schema and in get_markdown_guide), assets (optional image data URLs), fileName (optional, no extension). Returns a 24-hour https download URL in the text block (and an MCP resource_link) — not a base64 application/pdf attachment. Give the user that URL as a markdown link. In Cursor, open it in a canvas iframe whose src is the URL. Run analyze_markdown first and fix its warnings.',
       inputSchema: renderInput,
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
     },
@@ -321,17 +322,44 @@ export function registerMarkdownStudio(server) {
         const name = safeFileName(requested || title, 'pdf');
         const seconds = ((Date.now() - started) / 1000).toFixed(1);
         const kb = (pdf.length / 1024).toFixed(0);
+        let download;
+        try {
+          download = await persistDownload({ body: pdf, fileName: name, origin: publicOrigin(ctx) });
+        } catch (err) {
+          console.error('[mcp] persist download failed:', err);
+          return toolError(`PDF rendered but could not be stored for download: ${err.message}`);
+        }
+        const extras = [normalized.toc ? 'TOC' : '', normalized.cover.enabled ? 'cover page' : ''].filter(Boolean);
+        const extra = extras.length ? `, ${extras.join(', ')}` : '';
+        const summary = [
+          `Rendered "${name}" — ${kb} KB in ${seconds}s (theme "${normalized.theme}", ${normalized.paperSize} ${normalized.orientation}${extra}).`,
+          `Download (expires in 24h): ${download.url}`,
+          '',
+          `Give the user that URL as a markdown link named "${name}". Do not wait for an attached application/pdf blob — many clients drop those, and this tool does not send one. There is nothing to decode with base64. If this client can show PDFs inline, open the URL there (Cursor: a canvas with <iframe src="${download.url}">). If it cannot, the link is the deliverable.`,
+          '',
+        ].join('\n');
         return {
           content: [
-            text(
-              `Rendered "${name}" — ${kb} KB in ${seconds}s (theme "${normalized.theme}", ${normalized.paperSize} ${normalized.orientation}${normalized.toc ? ', TOC' : ''}${normalized.cover.enabled ? ', cover page' : ''}). ` +
-                `The PDF is attached as a base64 application/pdf resource; decode it to save the file. ` +
-                `Now open it for the user right away — inside the client's own inline surface (Cursor: create a canvas that embeds this blob and shows it with <iframe src="data:application/pdf;base64,…">), not in a system viewer or browser, and without asking first. ` +
-                `Direct download alternative: POST the same JSON to ${publicOrigin(ctx)}/api/convert.`,
-            ),
-            { type: 'resource', resource: { uri: `markdown-studio://render/${encodeURIComponent(name)}`, mimeType: 'application/pdf', blob: pdf.toString('base64') } },
+            text(summary),
+            {
+              type: 'resource_link',
+              uri: download.url,
+              name,
+              title: name,
+              mimeType: 'application/pdf',
+              description: `Rendered PDF, ${kb} KB. Expires ${new Date(download.expiresAt).toISOString()}.`,
+              size: pdf.length,
+            },
           ],
-          structuredContent: { fileName: name, bytes: pdf.length, renderMs: Date.now() - started, title, settings: normalized, openInline: true },
+          structuredContent: {
+            fileName: name,
+            bytes: pdf.length,
+            renderMs: Date.now() - started,
+            title,
+            settings: normalized,
+            downloadUrl: download.url,
+            expiresAt: new Date(download.expiresAt).toISOString(),
+          },
         };
       } catch (error) {
         console.error('[mcp] render_pdf failed:', error);
@@ -475,10 +503,11 @@ export function registerMarkdownStudio(server) {
               '- Follow the Markdown Studio authoring guide exactly (call get_markdown_guide if you have not read it in this session).',
               kind && kind !== 'other' ? `- Start from the "${kind}" template (get_template) and keep its recommended settings unless the brief says otherwise.` : '- Pick the closest template from list_templates and reuse its settings.',
               '- One `#` title, `##` sections, tables for structured data, callouts for key points, titled code blocks for code.',
+              '- Do not put `---` above headings; H2s already have a rule and a divider looks like a double line.',
               '- Do not write a manual table of contents or number headings by hand; use settings.toc / settings.headingNumbers.',
               '- Tell the user the design settings you will use (theme, paper, TOC, cover, header/footer) so they can change them; every argument is in get_markdown_guide / server instructions.',
               '- Run analyze_markdown and fix every warning before rendering.',
-              '- Finish by calling render_pdf with the chosen settings, then immediately open the PDF inline for the user (Cursor: a canvas embedding it — not an external viewer) and report the file name.',
+              '- Finish by calling render_pdf with the chosen settings, then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL) and report the file name.',
             ].join('\n'),
           },
         },
@@ -504,7 +533,7 @@ export function registerMarkdownStudio(server) {
               '',
               'Steps:',
               '1. Call analyze_markdown on it and read the warnings.',
-              '2. Apply the authoring guide (get_markdown_guide): a single H1, no skipped heading levels, languages on code fences, GitHub callouts instead of bold "Note:" lines, real tables instead of aligned text, footnotes for sources, no LaTeX/HTML/front-matter.',
+              '2. Apply the authoring guide (get_markdown_guide): a single H1, no skipped heading levels, no `---` above headings, languages on code fences, GitHub callouts instead of bold "Note:" lines, real tables instead of aligned text, footnotes for sources, no LaTeX/HTML/front-matter.',
               '3. Re-run analyze_markdown until there are no warnings.',
               '4. Suggest a full settings object (theme, paper, fonts, TOC, cover, header/footer) using the argument catalog, then return the polished Markdown.',
               '',
@@ -542,11 +571,11 @@ export function registerMarkdownStudio(server) {
               '',
               'Steps:',
               '1. Call import_web_page with the URL (format "markdown"). Read the returned metadata, outline and warnings.',
-              '2. Clean the Markdown without changing its meaning: keep a single H1 (the page title), remove leftover navigation/"share"/"related" fragments, fix skipped heading levels, add languages to code fences, turn "Note:"-style paragraphs into callouts, and drop broken or tracking links. Keep images that carry information; drop decorative ones.',
+              '2. Clean the Markdown without changing its meaning: keep a single H1 (the page title), remove leftover navigation/"share"/"related" fragments, delete `---` above headings, fix skipped heading levels, add languages to code fences, turn "Note:"-style paragraphs into callouts, and drop broken or tracking links. Keep images that carry information; drop decorative ones.',
               '3. Add a closing line or footnote with the source URL and the import date.',
               '4. Run analyze_markdown until there are no warnings.',
               '5. Tell the user the design settings you propose (theme, paper, TOC, header/footer with the site name, page numbers) — pick "clean" + toc for docs, "editorial" for long-form articles — and apply what they confirm.',
-              '6. Call render_pdf with markdown + settings + fileName (use the suggested fileName), then immediately open the PDF inline for the user (Cursor: a canvas embedding it — not an external viewer) and report the result.',
+              '6. Call render_pdf with markdown + settings + fileName (use the suggested fileName), then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL) and report the result.',
             ]
               .filter(Boolean)
               .join('\n'),
@@ -587,7 +616,7 @@ export function registerMarkdownStudio(server) {
               '- Chrome: header.text, header.showDate, footer.text, footer.pageNumbers, footer.pageNumberStyle, logo',
               '- Output: fileName; optional assets for local images',
               'Recommend a recipe for this document type, apply what they confirm (or your recommendation if they want you to decide).',
-              'Follow the authoring guide. Run analyze_markdown and fix warnings. Call render_pdf with markdown + settings + assets + fileName, then immediately open the PDF inline for the user (Cursor: a canvas embedding it — never an external viewer, never ask first). Tell them the file name and which settings you used.',
+              'Follow the authoring guide (no `---` above headings). Run analyze_markdown and fix warnings. Call render_pdf with markdown + settings + assets + fileName, then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL). Tell them the file name and which settings you used.',
             ]
               .filter(Boolean)
               .join('\n'),

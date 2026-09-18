@@ -7,7 +7,8 @@ import { normalizeSettings, resolveDesign } from '../src/lib/document/settings.j
 import { withBrowser } from '../src/lib/pdf/browser.js';
 import { analyzeMarkdown } from '../src/lib/mcp/analyze.js';
 
-const directives = ['\\pagebreak', '\\newpage', '<!-- pagebreak -->', '<!-- page-break -->', '<!-- newpage -->', '---pagebreak---'];
+const directives = ['\\pagebreak', '\\newpage', '<!-- pagebreak -->', '<!-- page-break -->', '<!-- newpage -->', '---pagebreak---', '{: .newpage }', '{:.newpage}', '{: .pagebreak }', '{: .page-break }'];
+const headingIals = ['## Pay {: .newpage }', '## Pay {:.newpage}', '## Pay {: .pagebreak }', '## Pay\n{: .newpage }'];
 const table = (count) => '| Item | Monthly amount |\n| --- | --- |\n'
   + Array.from({ length: count }, (_, i) => `| Row ${i + 1} | ${1500 + i * 10} USD |`).join('\n');
 
@@ -17,14 +18,52 @@ test('all documented page-break forms agree with the analyzer', () => {
     assert.equal((markdownToHtml(md).match(/class="page-break"/g) || []).length, 1, directive);
     assert.equal(analyzeMarkdown(md).stats.pageBreaks, 1, directive);
   }
+  for (const heading of headingIals) {
+    const md = `# Terms\n\n${heading}\n\nAll amounts.`;
+    const html = markdownToHtml(md);
+    assert.equal((html.match(/class="page-break"/g) || []).length, 1, heading);
+    assert.match(html, /<h2 id="pay">Pay<\/h2>/, heading);
+    assert.doesNotMatch(html, /\{:/, heading);
+    const analysis = analyzeMarkdown(md);
+    assert.equal(analysis.stats.pageBreaks, 1, heading);
+    assert.equal(analysis.outline.at(-1).text, 'Pay', heading);
+    assert.match(html, /<h1[^>]*>Terms<\/h1>[\s\S]*<div class="page-break"><\/div>\s*<h2 id="pay">Pay<\/h2>/, heading);
+  }
+  const kpi = '# Terms\n\n## 4. KPIs {: .newpage }\n\nVideo channels.';
+  const kpiHtml = markdownToHtml(kpi);
+  assert.match(kpiHtml, /<div class="page-break"><\/div>\s*<h2 id="4-kpis">4. KPIs<\/h2>/);
+  assert.doesNotMatch(kpiHtml, /\{:/);
+  assert.equal(analyzeMarkdown(kpi).outline.at(-1).text, '4. KPIs');
+  const between = markdownToHtml('# Terms\n\n## Intro\n\nText.\n\n{: .newpage }\n\n## Pay\n\nMore.');
+  assert.match(between, /Intro<\/h2>[\s\S]*<div class="page-break"><\/div>\s*<h2 id="pay">Pay<\/h2>/);
 });
 
 test('page-break words and examples are literal, including unhighlighted HTML code', () => {
   for (const text of ['pagebreak', 'newpage', '\\pagebreak is a command', '`\\pagebreak`',
-    '```text\n<!-- pagebreak -->\n\\pagebreak\n---pagebreak---\n```',
-    '    <!-- pagebreak -->', 'before <!-- pagebreak --> after']) {
+    '```text\n<!-- pagebreak -->\n\\pagebreak\n---pagebreak---\n{: .newpage }\n```',
+    '    <!-- pagebreak -->', 'before <!-- pagebreak --> after', '## Pay {: .foo }',
+    'A heading {: .foo } stays literal', 'In prose {: .newpage } is not a break']) {
     assert.doesNotMatch(markdownToHtml(text), /class="page-break"/, text);
   }
+});
+
+test('analyzer flags a divider immediately before a heading', () => {
+  const flagged = analyzeMarkdown('# Terms\n\n---\n\n## Pay\n\nText.');
+  assert.ok(flagged.warnings.some((w) => w.code === 'hr-before-heading'));
+  const ok = analyzeMarkdown('# Terms\n\n## Pay\n\nText.\n\n---\n\nA break in the middle of a section.');
+  assert.ok(!ok.warnings.some((w) => w.code === 'hr-before-heading'));
+});
+
+test('empty table headers omit the coloured header row', () => {
+  const html = markdownToHtml('|  |  |\n| --- | --- |\n| From | Acme |\n| To | Jane |');
+  assert.doesNotMatch(html, /<thead>/);
+  assert.doesNotMatch(html, /<th[>\s]/);
+  assert.match(html, /class="no-header"/);
+  assert.match(html, /<td>From<\/td>/);
+  const headed = markdownToHtml('| Name | Role |\n| --- | --- |\n| Ada | Eng |');
+  assert.match(headed, /<thead>/);
+  assert.match(headed, /<th>Name<\/th>/);
+  assert.doesNotMatch(headed, /no-header/);
 });
 
 test('real Chromium pagination keeps section openings together', { timeout: 120_000 }, async (t) => {
@@ -92,6 +131,13 @@ test('real Chromium pagination keeps section openings together', { timeout: 120_
         assert.doesNotMatch(pages[0], /Pay/);
         assert.match(pages[1], /Pay.*Row 4/);
       }
+      for (const heading of ['## Pay {: .newpage }', '## Pay\n{: .newpage }']) {
+        const pages = await pdfPages(fixture(0.1, 4, {}, '').replace('## Pay', heading), { pageBreaks: 'h2' });
+        assert.equal(pages.length, 2, heading);
+        assert.doesNotMatch(pages[0], /Pay/);
+        assert.match(pages[1], /Pay.*Row 4/);
+        assert.doesNotMatch(pages.join(' '), /newpage|\{:/);
+      }
     });
     await t.test('leading, repeated and trailing markers do not create blank pages', async () => {
       const pages = await pdfPages('\\pagebreak\n\n\\pagebreak\n\n# First\n\nText.\n\n\\pagebreak\n\n\\pagebreak\n\n## Second\n\nText.\n\n\\pagebreak\n\n\\pagebreak');
@@ -135,6 +181,42 @@ test('real Chromium pagination keeps section openings together', { timeout: 120_
         // Wait for the preview's 120ms resize debounce before checking idempotence.
         await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 180)));
         assert.deepEqual(await layout(), { gaps: 1, moved: true, intact: true });
+      } finally { await page.close(); }
+    });
+    await t.test('preview splits long tables on row boundaries and repeats a real header', async () => {
+      const page = await render(fixture(0.2, 65), {}, 'preview');
+      try {
+        const info = await page.evaluate(() => ({
+          cont: document.querySelectorAll('.table-wrap[data-pg-cont]').length,
+          theads: document.querySelectorAll('thead').length,
+          th: (document.querySelector('thead th') || {}).textContent,
+          gaps: document.querySelectorAll('.page-gap').length,
+          guides: document.querySelectorAll('.page-guide').length,
+        }));
+        assert.ok(info.cont >= 1, 'long tables must continue on a following preview page');
+        assert.equal(info.theads, info.cont + 1);
+        assert.equal(info.th, 'Item');
+        assert.ok(info.gaps >= 1, 'continuations must start on a new preview page');
+        assert.equal(info.guides, 0);
+      } finally { await page.close(); }
+    });
+    await t.test('headerless tables do not draw a header bar when they continue', async () => {
+      const md = '# Terms\n\n|  |  |\n| --- | --- |\n'
+        + Array.from({ length: 65 }, (_, i) => `| Row ${i + 1} | ${1500 + i * 10} USD |`).join('\n');
+      const page = await render(md, { theme: 'corporate' }, 'preview');
+      try {
+        const info = await page.evaluate(() => ({
+          theads: document.querySelectorAll('thead').length,
+          ths: document.querySelectorAll('th').length,
+          cont: document.querySelectorAll('.table-wrap[data-pg-cont]').length,
+          gaps: document.querySelectorAll('.page-gap').length,
+          guides: document.querySelectorAll('.page-guide').length,
+        }));
+        assert.equal(info.theads, 0);
+        assert.equal(info.ths, 0);
+        assert.ok(info.cont >= 1);
+        assert.ok(info.gaps >= 1);
+        assert.equal(info.guides, 0);
       } finally { await page.close(); }
     });
   });

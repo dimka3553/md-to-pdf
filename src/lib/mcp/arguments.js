@@ -71,7 +71,7 @@ export const FIELD_HELP = {
     .join(', ')}. Default "${DEFAULT_SETTINGS.background}".`,
   pageBreaks: `Pagination: ${Object.entries(PAGE_BREAK_MODES)
     .map(([k, v]) => `"${k}" (${v.name})`)
-    .join(', ')}. Default "${DEFAULT_SETTINGS.pageBreaks}". Auto keeps headings and short introductions with compact tables/blocks, and the opening rows of longer tables. For an editorial break, put \\pagebreak on a separate paragraph BEFORE the section heading. Inspect the rendered PDF after layout changes.`,
+    .join(', ')}. Default "${DEFAULT_SETTINGS.pageBreaks}". Auto keeps headings and short introductions with compact tables/blocks, and the opening rows of longer tables. For an editorial break, put \\pagebreak on a separate paragraph BEFORE the section heading, or \`{: .newpage }\` at the end of the heading line. Inspect the rendered PDF after layout changes.`,
   toc: `Insert a generated table of contents from ## / ### (after the title, or on its own page when a cover is on). Default ${DEFAULT_SETTINGS.toc}. Do not write a TOC by hand.`,
   headingNumbers: `Auto-number H1–H3 as 1 / 1.1 / 1.1.1. Default ${DEFAULT_SETTINGS.headingNumbers}. Do not number headings by hand.`,
   justify: `Justify body paragraphs. Default ${DEFAULT_SETTINGS.justify}.`,
@@ -104,22 +104,22 @@ export const FIELD_HELP = {
 
 /**
  * What the agent must do the moment `render_pdf` returns. Shared by the server
- * instructions, the authoring guide, the tool description/result and the skill
- * so every surface gives the same answer: open the PDF inline, right away.
+ * instructions, the authoring guide, the tool description/result and the skill.
  */
-export const OPEN_PDF_INSTRUCTIONS = `## After rendering: open the PDF immediately
+export const OPEN_PDF_INSTRUCTIONS = `## After rendering: give the user the download URL
 
-The moment \`render_pdf\` returns, show the PDF to the user — automatically, without being asked and without asking "shall I open it?". Never stop at "the PDF is ready" or a bare file path.
+\`render_pdf\` does **not** send the PDF as base64. Many clients drop \`application/pdf\` resources, and a real PDF is hundreds of kilobytes of tokens. The file is stored for 24 hours and the tool result's **text** block contains a URL: \`https://<host>/d/<id>.pdf\`. Text always survives. There is also an MCP \`resource_link\` to the same URL.
 
-1. **Save it.** Decode the base64 resource and write \`<fileName>.pdf\` next to the source Markdown (or where the user asked) so they keep the file.
-2. **Open it inside the client's own inline surface**, never in an external application:
-   - **Cursor:** create a canvas — one \`<file-name>.canvas.tsx\` in \`~/.cursor/projects/<workspace>/canvases/\` (follow the Cursor canvas skill). Inline the base64 blob from the tool result as a string constant and render it with \`<iframe src={"data:application/pdf;base64," + PDF_BASE64} title="<file name>" style={{ width: "100%", height: "100vh", border: 0 }} />\` (or \`<embed type="application/pdf">\`). The canvas must not \`fetch()\` or read files — the PDF has to be embedded. Keep it minimal: the viewer filling the pane plus a one-line header with the file name, paper size and theme. Link the canvas file in your reply so it opens beside the chat. If the host cannot display PDFs inline, call \`render_html\` with the same arguments and show that HTML in the same canvas via \`<iframe srcDoc={HTML} />\` — it uses the same CSS as the PDF.
-   - **Claude Desktop, ChatGPT and other clients with an artifact / preview pane:** put the PDF in that inline pane the same way.
-   - **No inline surface (plain CLI):** print the saved absolute path and stop.
-3. **Do not** launch a system viewer or browser (\`open\`, \`xdg-open\`, \`start\`, Preview, Acrobat, a new browser tab) — the user wants to see the PDF beside the chat, not in another window.
-4. After it is open, confirm the file name and the settings you used. When the user asks for changes, re-render and update the **same** canvas so the new PDF replaces the old one in place.
+The moment the tool returns, show that URL to the user — automatically, without asking. Never stop at "the PDF is ready". Never try to \`base64 -d\` an attachment that is not there. If the client prints "Resources of type 'application/pdf' are not currently supported", ignore it; the download URL is the file.
 
-\`render_html\` output should be shown the same way (canvas + \`<iframe srcDoc>\`), when the user asked to see it.`;
+1. **Put the URL in your reply** as a markdown link named with the file name, e.g. \`[Offer.pdf](https://…/d/….pdf)\`. That is the deliverable in every client.
+2. **Open it inline only when this client actually can:**
+   - **Cursor:** create a canvas (\`~/.cursor/projects/<workspace>/canvases/<file-name>.canvas.tsx\`) whose viewer is \`<iframe src={DOWNLOAD_URL} title="…" style={{ width: "100%", height: "100vh", border: 0 }} />\`. Use the https URL from the tool result, not a data URI. One-line header with file name, paper and theme. Link the canvas beside the chat. Do not launch Preview, Chrome, or \`open\`.
+   - **Claude Desktop / claude.ai / ChatGPT:** present the markdown link. If you have a files/outputs tool, you may download the URL into that folder and attach the saved file — do not retype the PDF, do not paste the styled HTML as a substitute, and do not POST to \`/api/convert\` unless the user is on a host that can reach it.
+   - **CLI with a writable disk and egress to the host:** \`curl -L -o <fileName> '<downloadUrl>'\` and print the path.
+3. Confirm the file name, theme, paper and that the link expires in 24 hours. When the user asks for changes, re-render and replace the previous link (and the same canvas, in Cursor).
+
+If you need a quick look at styling without a PDF, call \`render_html\` (\`text/html\` usually passes through). Do not rebuild the PDF in a local browser to work around a missing blob.`;
 
 /** Human-readable catalog for server instructions, get_markdown_guide, and the skill. */
 export function buildArgumentCatalog() {
@@ -238,7 +238,7 @@ Use it whenever the user hands you a URL. Then polish the Markdown (fix the repo
 
 ### \`render_pdf\` / \`render_html\`
 
-Same arguments. \`render_pdf\` uses headless Chromium (3–15 s) and returns a base64 \`application/pdf\` resource. \`render_html\` is fast and returns standalone HTML with the same CSS. As soon as \`render_pdf\` returns, save the file and open it inline for the user (Cursor: a canvas embedding the PDF) — see **After rendering** above.
+Same arguments. \`render_pdf\` uses headless Chromium (3–15 s) and returns a 24-hour download URL in the text (\`https://<host>/d/<id>.pdf\`) plus an MCP \`resource_link\` — not a base64 PDF. \`render_html\` is fast and returns standalone HTML with the same CSS. As soon as \`render_pdf\` returns, give the user that URL (see **After rendering** above).
 
 | Argument | Required | Meaning |
 | --- | --- | --- |
@@ -326,7 +326,7 @@ ${logoPosTable}
 
 ${logoSizeTable}
 
-Placeholders: \`{title}\` in \`header.text\` / \`footer.text\` becomes the document title (the first H1). Forced page break in Markdown: \`\\\\pagebreak\` or \`<!-- pagebreak -->\` on its own line. Image size hint: \`![alt](url =WIDTHxHEIGHT)\` (either dimension may be omitted, e.g. \`=300x\`).
+Placeholders: \`{title}\` in \`header.text\` / \`footer.text\` becomes the document title (the first H1). Forced page break in Markdown: \`\\\\pagebreak\` or \`<!-- pagebreak -->\` on its own line, or \`{: .newpage }\` on a heading. Image size hint: \`![alt](url =WIDTHxHEIGHT)\` (either dimension may be omitted, e.g. \`=300x\`).
 
 ### Prompt arguments
 

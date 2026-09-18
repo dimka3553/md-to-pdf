@@ -20,7 +20,7 @@ A Markdown editor that exports polished, print-ready PDFs — with a live previe
 - Logo: beside the title, above the title, in the page header, on the cover, or as a watermark
 - Running header (text, date) and footer (text, page numbers)
 - Cover page, table of contents, numbered headings
-- Page-break control: smart section openings and compact tables, before every H1, or before every H1 and H2; manual `\pagebreak`
+- Page-break control: smart section openings and compact tables, before every H1, or before every H1 and H2; manual `\pagebreak` or `{: .newpage }`
 
 **Markdown**
 - GitHub-flavoured Markdown, task lists, tables, footnotes
@@ -47,7 +47,7 @@ Streamable HTTP, stateless, no sign-up. It teaches the agent the exact syntax th
 | `import_web_page` | Turn a public URL into clean Markdown (or HTML): rendered in headless Chromium (JavaScript executed, lazy content scrolled in), chrome stripped using the rendered layout, tables/code/callouts/figures preserved, absolute links, page metadata and the same analysis as `analyze_markdown`. Options `format`, `stripImages`, `stripLinks` |
 | `analyze_markdown` | Linter: outline, stats and line-numbered warnings (skipped heading levels, fences without a language, YAML front-matter, LaTeX, raw HTML, ragged tables, missing assets, undefined footnotes…) |
 | `render_html` | Standalone HTML with the same CSS as the PDF (fast, no browser) |
-| `render_pdf` | The PDF, returned as a base64 `application/pdf` embedded resource. The server instructs the agent to save it and open it inline immediately (in Cursor: a canvas embedding the PDF) rather than in an external viewer |
+| `render_pdf` | The PDF, stored for 24 hours. The tool result text contains `https://<host>/d/<id>.pdf` (and an MCP `resource_link`). Give the user that URL; in Cursor, open it in a canvas iframe. No base64 attachment |
 
 Also exposed: resources `markdown-studio://guide`, `markdown-studio://design-options`, `markdown-studio://templates/{id}` and prompts `write_document`, `polish_markdown`, `make_pdf`, `pdf_from_url` (import a page → clean up → render).
 
@@ -119,15 +119,15 @@ npm run dev
 
 PDFs are rendered with headless Chromium. Locally, an installed Google Chrome is used automatically (or set `PUPPETEER_EXECUTABLE_PATH`). On Vercel/Lambda, `@sparticuz/chromium-min` downloads a matching Chromium build at runtime.
 
-Environment variables (all optional): `NEXT_PUBLIC_SITE_URL` (public URL used in metadata and MCP responses), `MCP_API_KEY` (protects `/api/mcp`), `PUPPETEER_EXECUTABLE_PATH`.
+Environment variables (all optional): `NEXT_PUBLIC_SITE_URL` (public URL used in metadata and MCP responses), `MCP_API_KEY` (protects `/api/mcp`), `PUPPETEER_EXECUTABLE_PATH`. On Vercel, connect a **private** Blob store to the project so `render_pdf` can persist files; the SDK uses `BLOB_STORE_ID` + OIDC. Locally, PDFs are written under `DOWNLOAD_DIR` or the OS temp directory.
 
 ## API
 
 ### Pagination
 
-Automatic pagination keeps headings with up to two short introductory paragraphs and the following compact table, list, figure, or code block when that opening fits within half a usable page. Standalone tables up to 40% of a page stay intact. Longer tables can split between rows, repeat their headers, and keep their first two rows with the section opening when it fits. Paragraphs protect three lines on either side of a break. A heading can start halfway down a page when enough content fits below it.
+Automatic pagination keeps headings with up to two short introductory paragraphs and the following compact table, list, figure, or code block when that opening fits within half a usable page. Longer tables can split between rows, repeat a real header (empty headers are omitted), and keep their first two rows with the section opening when it fits. Paragraphs protect three lines on either side of a break. A heading can start halfway down a page when enough content fits below it.
 
-For precise control, insert `\pagebreak` (or `<!-- pagebreak -->`) on its own line with blank lines around it, **before the heading**:
+For precise control, insert `\pagebreak` (or `<!-- pagebreak -->`) on its own line with blank lines around it, **before the heading**. You can also put `{: .newpage }` at the end of the heading line:
 
 ```md
 End of the previous section.
@@ -139,9 +139,13 @@ End of the previous section.
 All amounts are in USD per month.
 ```
 
-The toolbar's **Page break** button inserts this marker. It is invisible in the PDF. `\newpage`, `<!-- page-break -->`, `<!-- newpage -->`, and `---pagebreak---` are also supported; code examples remain literal. `---` alone is a divider, not a page break. Use `settings.pageBreaks: "h1"` or `"h2"` to start every H1 or H1/H2 on a new page.
+```md
+## 4. KPIs {: .newpage }
+```
 
-Check the PDF after changing content or design settings. The live preview estimates splits inside long blocks; the PDF is authoritative. The MCP guide and generated agent skill explain the same rules, and `analyze_markdown` checks marker syntax rather than physical page positions.
+The toolbar's **Page break** button inserts this marker. It is invisible in the PDF. `\newpage`, `<!-- page-break -->`, `<!-- newpage -->`, `---pagebreak---`, and `{: .newpage }` (on a heading or its own line) are also supported; code examples remain literal. `---` alone is a divider, not a page break. Use `settings.pageBreaks: "h1"` or `"h2"` to start every H1 or H1/H2 on a new page.
+
+Check the PDF after changing content or design settings. The live preview shows a full page at every break, including inside long tables, lists and code. The MCP guide and generated agent skill explain the same rules, and `analyze_markdown` checks marker syntax rather than physical page positions.
 
 ### `POST /api/convert`
 
@@ -175,6 +179,10 @@ All `settings` keys are optional; see `src/lib/document/settings.js` for every v
 
 Options: `"inline": true` returns `Content-Disposition: inline`; `"format": "html"` returns the rendered HTML instead of a PDF.
 
+### `GET /d/<id>.pdf`
+
+Short-lived download of a PDF produced by MCP `render_pdf`. Unguessable id, expires after 24 hours, `Content-Disposition: inline`. Locally the file is on disk; on Vercel it is read from the private Blob store. Direct `POST /api/convert` still returns the PDF body and does not create one of these links.
+
 ### `GET /api/scrape?url=…` and `GET /api/scrapehtml?url=…`
 
 Renders a web page in headless Chromium — waiting for client-side JavaScript and scrolling so lazy-loaded sections mount — then uses the rendered layout (computed styles, geometry) to drop hidden elements, fixed banners, navigation and sidebars, and converts what is actually visible, in reading order, to GitHub-flavoured Markdown or cleaned HTML. Tables keep inline code, code blocks keep their language, docs-style admonitions become `> [!NOTE]` alerts, figures keep captions, KaTeX/MathJax becomes `$…$`. Optional `images=false` drops images and `links=false` replaces hyperlinks with their text. The same importer powers the **Import from URL** page (`/scraper`, deep-linkable as `/scraper?url=…`) and the `import_web_page` MCP tool.
@@ -192,9 +200,11 @@ Renders a web page in headless Chromium — waiting for client-side JavaScript a
 ```
 src/lib/document/   isomorphic renderer: settings → CSS, markdown → HTML (shared by preview and PDF)
 src/lib/pdf/        Chromium launcher and PDF generation
+src/lib/downloads.js  short-lived PDF store (filesystem locally, private Vercel Blob in production)
 src/lib/mcp/        MCP server: authoring guide, linter, tool/resource/prompt registration
 src/lib/scraper/    web page → Markdown/HTML
 src/components/     editor UI (CodeMirror, toolbar, design panel, preview)
 src/app/api/        route handlers (convert, mcp, scrape)
+src/app/d/          `GET /d/<id>.pdf` — 24-hour download links from `render_pdf`
 skills/, rules/     Agent Skill + Cursor rule shipped with the plugin (.cursor-plugin, .claude-plugin, .mcp.json)
 ```

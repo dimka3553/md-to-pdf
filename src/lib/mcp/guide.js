@@ -8,7 +8,7 @@
 
 import { ARGUMENT_CATALOG } from './arguments.js';
 
-export const GUIDE_VERSION = '1.4.0';
+export const GUIDE_VERSION = '1.6.0';
 
 export const MARKDOWN_GUIDE = `# Writing Markdown for Markdown Studio
 
@@ -24,7 +24,7 @@ front-matter, custom CSS) does **not**.
 4. Run \`analyze_markdown\` — it returns the outline plus warnings (skipped heading levels, code fences without a language, YAML front-matter, missing images, ragged tables…). Fix everything it reports.
 5. If the user asked for a nice PDF, tell them the design knobs (theme, paper, TOC, cover, header/footer, fonts) and agree a \`settings\` object — the full argument list is at the end of this guide.
 6. Render with \`render_pdf\` (or \`render_html\` for a quick look). Pass \`markdown\`, \`settings\`, optional \`assets\` and \`fileName\`.
-7. **Open the PDF immediately** — save it, then show it inside the client's own inline surface (in Cursor: a canvas that embeds the PDF), never in an external viewer or browser, and without asking first. See *After rendering: open the PDF immediately* at the end of this guide.
+7. **Give the user the download URL** from the \`render_pdf\` text result (\`https://<host>/d/<id>.pdf\`, valid 24 hours). Do not expect a base64 PDF attachment. See *After rendering* at the end of this guide.
 
 ## Document structure
 
@@ -34,6 +34,7 @@ front-matter, custom CSS) does **not**.
 - Keep paragraphs to 2–4 sentences. Prefer a list or table over a paragraph that enumerates things.
 - Do **not** write your own table of contents — enable \`settings.toc\` and it is generated from \`##\`/\`###\` headings with correct page anchors.
 - Do **not** number headings by hand ("2.1 Scope") — enable \`settings.headingNumbers\`.
+- Do **not** put \`---\` (or \`***\` / \`___\`) above a heading. H2s already have a rule; a divider plus a heading looks like a double line. A blank line before \`##\` is enough.
 - Don't hard-wrap lines at 80 columns; one paragraph = one line. A single trailing double-space (or a backslash) forces a line break; otherwise a blank line separates paragraphs.
 - Separate every block (heading, list, table, code fence, quote) from its neighbours with a blank line.
 
@@ -60,7 +61,7 @@ Lists may contain paragraphs, code blocks and tables when indented to the item's
 
 ### Tables
 
-Tables get striped rows and a coloured header. Compact tables stay together; longer tables split between rows and repeat their header.
+Tables get striped rows. A non-empty first row is styled as a coloured header and repeats when the table splits across pages. Leave the header cells empty (\`|  |  |\`) for key–value blocks — they render as a plain grid with no header bar.
 
 \`\`\`md
 | Metric | Q2 | Q3 | Change |
@@ -150,12 +151,12 @@ Put \`\\pagebreak\` (or \`<!-- pagebreak -->\`) on its own line, surrounded by b
 
 Use \`settings.pageBreaks: "auto"\` by default. Pagination uses the rendered size, including fonts, paper, margins, images and running headers/footers:
 - Headings stay with their opening content. Up to two short introductory paragraphs (each at most three rendered lines) stay with the heading.
-- A heading, introduction and following table/list/figure/code block stay together when that opening fits within half a usable page. Compact tables up to 40% of a usable page also stay intact on their own.
-- For longer tables, the heading and short introduction stay with the table header and first two body rows when that opening fits within half a page. The remaining rows can flow onto later pages with repeated headers. Exceptionally tall rows/blocks may need to split.
+- A heading, introduction and following table/list/figure/code block stay together when that opening fits within half a usable page.
+- For longer tables, the heading and short introduction stay with the table header (if any) and first two body rows when that opening fits within half a page. The remaining rows can flow onto later pages; a real header is repeated, an empty header is not. Exceptionally tall rows/blocks may need to split.
 - Paragraphs avoid leaving fewer than three lines on either side of a page break. A divider immediately before a heading stays with that heading.
 - There is no rule that every heading below the halfway point must move: keep it on the current page when a useful opening fits. Avoid forcing every small subsection onto a fresh page.
 
-For an intentional section boundary, put the marker **before the heading**, never between its introduction and table:
+For an intentional section boundary, put the marker **before the heading**, never between its introduction and table. You can also mark the heading itself with \`{: .newpage }\`:
 
 \`\`\`md
 End of the previous section.
@@ -171,13 +172,19 @@ All amounts are in USD per month.
 | Base pay | 1,500 |
 \`\`\`
 
-The marker is invisible in the PDF; the editor toolbar's **Page break** button inserts it. \`\\newpage\`, \`<!-- page-break -->\`, \`<!-- newpage -->\` and \`---pagebreak---\` are aliases. Markers inside code examples are literal text. \`---\` is a visual divider, not a page break.
+\`\`\`md
+## Pay {: .newpage }
+\`\`\`
 
-After rendering, inspect the actual PDF page transitions. If a section needs an editorial break, insert the marker before its heading and render again. Do not guess page positions from Markdown line counts or pad with blank lines. Recheck manual breaks after changing paper, fonts, margins or content. \`analyze_markdown\` checks syntax, not physical page layout; the live preview estimates long-block splits, while the PDF is authoritative.
+The marker is invisible in the PDF; the editor toolbar's **Page break** button inserts it. \`\\newpage\`, \`<!-- page-break -->\`, \`<!-- newpage -->\`, \`---pagebreak---\`, and \`{: .newpage }\` (on a heading, immediately under a heading, or on its own line) are aliases. \`{:.newpage}\`, \`{: .pagebreak }\` and \`{: .page-break }\` work too. Markers inside code examples are literal text. \`---\` is a visual divider, not a page break.
+
+After rendering, inspect the actual PDF page transitions. If a section needs an editorial break, insert the marker before its heading and render again. Do not guess page positions from Markdown line counts or pad with blank lines. Recheck manual breaks after changing paper, fonts, margins or content. \`analyze_markdown\` checks syntax, not physical page layout; the live preview shows a page at every split, while the PDF is authoritative.
 
 ### Horizontal rule
 
-\`---\` on its own line (with blank lines around it — directly under a text line it turns that line into a heading).
+Avoid them. H2s already draw their own rule, so \`---\` above a heading is a double line and looks bad — delete it. A blank line before \`##\` is the only separator you need.
+
+If you truly need a thematic break in the middle of a section (not next to a heading), \`---\` on its own line with blank lines around it. Directly under a text line it turns that line into a heading.
 
 ## Design settings
 
@@ -231,6 +238,7 @@ Every nested field, enum, default and tool argument is listed at the end of this
 
 ## Anti-patterns (these render badly)
 
+- Horizontal rules (\`---\`) above \`##\` / \`###\` headings — H2s already have a bottom rule, so this reads as a double line. Delete the \`---\`; a blank line is enough.
 - YAML front-matter (\`---\\ntitle: …\\n---\`) — turns into a horizontal rule and a stray heading. Put the title in \`# H1\` instead.
 - LaTeX / MathJax (\`$x^2$\`, \`$$…$$\`) — printed literally. Write formulas in words or use \`<sup>\`/\`<sub>\`.
 - Raw HTML for layout (\`<table>\`, \`<div style>\`, \`<center>\`, \`<style>\`, \`<script>\`) — unstyled or stripped. Use Markdown tables.

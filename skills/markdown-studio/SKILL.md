@@ -3,7 +3,7 @@ name: markdown-studio
 description: Write well-formatted Markdown documents and export them as polished PDFs with Markdown Studio. Use when asked to write, format, polish or export a report, proposal, README, meeting notes, invoice, résumé or any document destined for PDF/print, or when Markdown must render correctly in Markdown Studio (md-to-pdf).
 ---
 
-<!-- Generated from src/lib/mcp/guide.js (v1.4.0) by scripts/build-skill.mjs — do not edit by hand. -->
+<!-- Generated from src/lib/mcp/guide.js (v1.6.0) by scripts/build-skill.mjs — do not edit by hand. -->
 
 ## Tooling
 
@@ -17,7 +17,7 @@ Markdown Studio exposes a remote MCP server at `https://md.dima.ua/api/mcp` (Str
 | `import_web_page` | Turn a public URL into clean Markdown + metadata + analysis (`url`, `format`, `stripImages`, `stripLinks`) |
 | `analyze_markdown` | Lint before rendering; fix every warning it reports |
 | `render_html` | Quick standalone HTML preview (`markdown`, `settings`, `assets`, `fileName`) |
-| `render_pdf` | Final PDF as a base64 `application/pdf` resource (same arguments as `render_html`). Save it and open it inline right away — in Cursor, a canvas embedding the PDF — never in an external viewer |
+| `render_pdf` | Final PDF as a 24-hour download URL in the text (`https://<host>/d/<id>.pdf`) plus an MCP `resource_link` — not a base64 attachment. Give the user that URL right away (Cursor: canvas iframe src = the URL) |
 
 Prompts: `write_document`, `polish_markdown`, `make_pdf` (walk through every design argument, then render), `pdf_from_url` (import a page, clean it up, render).
 
@@ -47,7 +47,7 @@ front-matter, custom CSS) does **not**.
 4. Run `analyze_markdown` — it returns the outline plus warnings (skipped heading levels, code fences without a language, YAML front-matter, missing images, ragged tables…). Fix everything it reports.
 5. If the user asked for a nice PDF, tell them the design knobs (theme, paper, TOC, cover, header/footer, fonts) and agree a `settings` object — the full argument list is at the end of this guide.
 6. Render with `render_pdf` (or `render_html` for a quick look). Pass `markdown`, `settings`, optional `assets` and `fileName`.
-7. **Open the PDF immediately** — save it, then show it inside the client's own inline surface (in Cursor: a canvas that embeds the PDF), never in an external viewer or browser, and without asking first. See *After rendering: open the PDF immediately* at the end of this guide.
+7. **Give the user the download URL** from the `render_pdf` text result (`https://<host>/d/<id>.pdf`, valid 24 hours). Do not expect a base64 PDF attachment. See *After rendering* at the end of this guide.
 
 ## Document structure
 
@@ -57,6 +57,7 @@ front-matter, custom CSS) does **not**.
 - Keep paragraphs to 2–4 sentences. Prefer a list or table over a paragraph that enumerates things.
 - Do **not** write your own table of contents — enable `settings.toc` and it is generated from `##`/`###` headings with correct page anchors.
 - Do **not** number headings by hand ("2.1 Scope") — enable `settings.headingNumbers`.
+- Do **not** put `---` (or `***` / `___`) above a heading. H2s already have a rule; a divider plus a heading looks like a double line. A blank line before `##` is enough.
 - Don't hard-wrap lines at 80 columns; one paragraph = one line. A single trailing double-space (or a backslash) forces a line break; otherwise a blank line separates paragraphs.
 - Separate every block (heading, list, table, code fence, quote) from its neighbours with a blank line.
 
@@ -83,7 +84,7 @@ Lists may contain paragraphs, code blocks and tables when indented to the item's
 
 ### Tables
 
-Tables get striped rows and a coloured header. Compact tables stay together; longer tables split between rows and repeat their header.
+Tables get striped rows. A non-empty first row is styled as a coloured header and repeats when the table splits across pages. Leave the header cells empty (`|  |  |`) for key–value blocks — they render as a plain grid with no header bar.
 
 ```md
 | Metric | Q2 | Q3 | Change |
@@ -173,12 +174,12 @@ Put `\pagebreak` (or `<!-- pagebreak -->`) on its own line, surrounded by blank 
 
 Use `settings.pageBreaks: "auto"` by default. Pagination uses the rendered size, including fonts, paper, margins, images and running headers/footers:
 - Headings stay with their opening content. Up to two short introductory paragraphs (each at most three rendered lines) stay with the heading.
-- A heading, introduction and following table/list/figure/code block stay together when that opening fits within half a usable page. Compact tables up to 40% of a usable page also stay intact on their own.
-- For longer tables, the heading and short introduction stay with the table header and first two body rows when that opening fits within half a page. The remaining rows can flow onto later pages with repeated headers. Exceptionally tall rows/blocks may need to split.
+- A heading, introduction and following table/list/figure/code block stay together when that opening fits within half a usable page.
+- For longer tables, the heading and short introduction stay with the table header (if any) and first two body rows when that opening fits within half a page. The remaining rows can flow onto later pages; a real header is repeated, an empty header is not. Exceptionally tall rows/blocks may need to split.
 - Paragraphs avoid leaving fewer than three lines on either side of a page break. A divider immediately before a heading stays with that heading.
 - There is no rule that every heading below the halfway point must move: keep it on the current page when a useful opening fits. Avoid forcing every small subsection onto a fresh page.
 
-For an intentional section boundary, put the marker **before the heading**, never between its introduction and table:
+For an intentional section boundary, put the marker **before the heading**, never between its introduction and table. You can also mark the heading itself with `{: .newpage }`:
 
 ```md
 End of the previous section.
@@ -194,13 +195,19 @@ All amounts are in USD per month.
 | Base pay | 1,500 |
 ```
 
-The marker is invisible in the PDF; the editor toolbar's **Page break** button inserts it. `\newpage`, `<!-- page-break -->`, `<!-- newpage -->` and `---pagebreak---` are aliases. Markers inside code examples are literal text. `---` is a visual divider, not a page break.
+```md
+## Pay {: .newpage }
+```
 
-After rendering, inspect the actual PDF page transitions. If a section needs an editorial break, insert the marker before its heading and render again. Do not guess page positions from Markdown line counts or pad with blank lines. Recheck manual breaks after changing paper, fonts, margins or content. `analyze_markdown` checks syntax, not physical page layout; the live preview estimates long-block splits, while the PDF is authoritative.
+The marker is invisible in the PDF; the editor toolbar's **Page break** button inserts it. `\newpage`, `<!-- page-break -->`, `<!-- newpage -->`, `---pagebreak---`, and `{: .newpage }` (on a heading, immediately under a heading, or on its own line) are aliases. `{:.newpage}`, `{: .pagebreak }` and `{: .page-break }` work too. Markers inside code examples are literal text. `---` is a visual divider, not a page break.
+
+After rendering, inspect the actual PDF page transitions. If a section needs an editorial break, insert the marker before its heading and render again. Do not guess page positions from Markdown line counts or pad with blank lines. Recheck manual breaks after changing paper, fonts, margins or content. `analyze_markdown` checks syntax, not physical page layout; the live preview shows a page at every split, while the PDF is authoritative.
 
 ### Horizontal rule
 
-`---` on its own line (with blank lines around it — directly under a text line it turns that line into a heading).
+Avoid them. H2s already draw their own rule, so `---` above a heading is a double line and looks bad — delete it. A blank line before `##` is the only separator you need.
+
+If you truly need a thematic break in the middle of a section (not next to a heading), `---` on its own line with blank lines around it. Directly under a text line it turns that line into a heading.
 
 ## Design settings
 
@@ -254,6 +261,7 @@ Every nested field, enum, default and tool argument is listed at the end of this
 
 ## Anti-patterns (these render badly)
 
+- Horizontal rules (`---`) above `##` / `###` headings — H2s already have a bottom rule, so this reads as a double line. Delete the `---`; a blank line is enough.
 - YAML front-matter (`---\ntitle: …\n---`) — turns into a horizontal rule and a stray heading. Put the title in `# H1` instead.
 - LaTeX / MathJax (`$x^2$`, `$$…$$`) — printed literally. Write formulas in words or use `<sup>`/`<sub>`.
 - Raw HTML for layout (`<table>`, `<div style>`, `<center>`, `<style>`, `<script>`) — unstyled or stripped. Use Markdown tables.
@@ -277,19 +285,20 @@ When someone asks you to make a nice PDF, tell them the knobs they can turn — 
 
 Recommend a starting set from the recipes (report → corporate + TOC + cover, README → clean + TOC, invoice → mono, and so on). If they say "just make it look good", apply the matching recipe and mention what you chose.
 
-## After rendering: open the PDF immediately
+## After rendering: give the user the download URL
 
-The moment `render_pdf` returns, show the PDF to the user — automatically, without being asked and without asking "shall I open it?". Never stop at "the PDF is ready" or a bare file path.
+`render_pdf` does **not** send the PDF as base64. Many clients drop `application/pdf` resources, and a real PDF is hundreds of kilobytes of tokens. The file is stored for 24 hours and the tool result's **text** block contains a URL: `https://<host>/d/<id>.pdf`. Text always survives. There is also an MCP `resource_link` to the same URL.
 
-1. **Save it.** Decode the base64 resource and write `<fileName>.pdf` next to the source Markdown (or where the user asked) so they keep the file.
-2. **Open it inside the client's own inline surface**, never in an external application:
-   - **Cursor:** create a canvas — one `<file-name>.canvas.tsx` in `~/.cursor/projects/<workspace>/canvases/` (follow the Cursor canvas skill). Inline the base64 blob from the tool result as a string constant and render it with `<iframe src={"data:application/pdf;base64," + PDF_BASE64} title="<file name>" style={{ width: "100%", height: "100vh", border: 0 }} />` (or `<embed type="application/pdf">`). The canvas must not `fetch()` or read files — the PDF has to be embedded. Keep it minimal: the viewer filling the pane plus a one-line header with the file name, paper size and theme. Link the canvas file in your reply so it opens beside the chat. If the host cannot display PDFs inline, call `render_html` with the same arguments and show that HTML in the same canvas via `<iframe srcDoc={HTML} />` — it uses the same CSS as the PDF.
-   - **Claude Desktop, ChatGPT and other clients with an artifact / preview pane:** put the PDF in that inline pane the same way.
-   - **No inline surface (plain CLI):** print the saved absolute path and stop.
-3. **Do not** launch a system viewer or browser (`open`, `xdg-open`, `start`, Preview, Acrobat, a new browser tab) — the user wants to see the PDF beside the chat, not in another window.
-4. After it is open, confirm the file name and the settings you used. When the user asks for changes, re-render and update the **same** canvas so the new PDF replaces the old one in place.
+The moment the tool returns, show that URL to the user — automatically, without asking. Never stop at "the PDF is ready". Never try to `base64 -d` an attachment that is not there. If the client prints "Resources of type 'application/pdf' are not currently supported", ignore it; the download URL is the file.
 
-`render_html` output should be shown the same way (canvas + `<iframe srcDoc>`), when the user asked to see it.
+1. **Put the URL in your reply** as a markdown link named with the file name, e.g. `[Offer.pdf](https://…/d/….pdf)`. That is the deliverable in every client.
+2. **Open it inline only when this client actually can:**
+   - **Cursor:** create a canvas (`~/.cursor/projects/<workspace>/canvases/<file-name>.canvas.tsx`) whose viewer is `<iframe src={DOWNLOAD_URL} title="…" style={{ width: "100%", height: "100vh", border: 0 }} />`. Use the https URL from the tool result, not a data URI. One-line header with file name, paper and theme. Link the canvas beside the chat. Do not launch Preview, Chrome, or `open`.
+   - **Claude Desktop / claude.ai / ChatGPT:** present the markdown link. If you have a files/outputs tool, you may download the URL into that folder and attach the saved file — do not retype the PDF, do not paste the styled HTML as a substitute, and do not POST to `/api/convert` unless the user is on a host that can reach it.
+   - **CLI with a writable disk and egress to the host:** `curl -L -o <fileName> '<downloadUrl>'` and print the path.
+3. Confirm the file name, theme, paper and that the link expires in 24 hours. When the user asks for changes, re-render and replace the previous link (and the same canvas, in Cursor).
+
+If you need a quick look at styling without a PDF, call `render_html` (`text/html` usually passes through). Do not rebuild the PDF in a local browser to work around a missing blob.
 
 ## Tool arguments
 
@@ -351,7 +360,7 @@ Use it whenever the user hands you a URL. Then polish the Markdown (fix the repo
 
 ### `render_pdf` / `render_html`
 
-Same arguments. `render_pdf` uses headless Chromium (3–15 s) and returns a base64 `application/pdf` resource. `render_html` is fast and returns standalone HTML with the same CSS. As soon as `render_pdf` returns, save the file and open it inline for the user (Cursor: a canvas embedding the PDF) — see **After rendering** above.
+Same arguments. `render_pdf` uses headless Chromium (3–15 s) and returns a 24-hour download URL in the text (`https://<host>/d/<id>.pdf`) plus an MCP `resource_link` — not a base64 PDF. `render_html` is fast and returns standalone HTML with the same CSS. As soon as `render_pdf` returns, give the user that URL (see **After rendering** above).
 
 | Argument | Required | Meaning |
 | --- | --- | --- |
@@ -375,7 +384,7 @@ Every key is optional. Unknown keys are ignored. Nested objects are merged field
 | `orientation` | enum | `portrait` | "portrait" or "landscape". Default "portrait". Use landscape for wide tables. |
 | `margins` | enum | `normal` | Page margins: "narrow" (Narrow), "normal" (Normal), "wide" (Wide). Default "normal". |
 | `background` | enum | `none` | Subtle full-page texture: "none" (None), "soft" (Soft tint), "gradient" (Gradient), "dots" (Dots), "grid" (Grid), "lines" (Ruled lines). Default "none". |
-| `pageBreaks` | enum | `auto` | Pagination: "auto" (Automatic), "h1" (Before each H1), "h2" (Before each H1 & H2). Default "auto". Auto keeps headings and short introductions with compact tables/blocks, and the opening rows of longer tables. For an editorial break, put \pagebreak on a separate paragraph BEFORE the section heading. Inspect the rendered PDF after layout changes. |
+| `pageBreaks` | enum | `auto` | Pagination: "auto" (Automatic), "h1" (Before each H1), "h2" (Before each H1 & H2). Default "auto". Auto keeps headings and short introductions with compact tables/blocks, and the opening rows of longer tables. For an editorial break, put \pagebreak on a separate paragraph BEFORE the section heading, or `{: .newpage }` at the end of the heading line. Inspect the rendered PDF after layout changes. |
 | `toc` | boolean | false | Insert a generated table of contents from ## / ### (after the title, or on its own page when a cover is on). Default false. Do not write a TOC by hand. |
 | `headingNumbers` | boolean | false | Auto-number H1–H3 as 1 / 1.1 / 1.1.1. Default false. Do not number headings by hand. |
 | `justify` | boolean | false | Justify body paragraphs. Default false. |
@@ -484,7 +493,7 @@ Plus `"inherit"` on `font` / `headingFont` to keep the theme default.
 | `md` | Medium | 48px |
 | `lg` | Large | 72px |
 
-Placeholders: `{title}` in `header.text` / `footer.text` becomes the document title (the first H1). Forced page break in Markdown: `\\pagebreak` or `<!-- pagebreak -->` on its own line. Image size hint: `![alt](url =WIDTHxHEIGHT)` (either dimension may be omitted, e.g. `=300x`).
+Placeholders: `{title}` in `header.text` / `footer.text` becomes the document title (the first H1). Forced page break in Markdown: `\\pagebreak` or `<!-- pagebreak -->` on its own line, or `{: .newpage }` on a heading. Image size hint: `![alt](url =WIDTHxHEIGHT)` (either dimension may be omitted, e.g. `=300x`).
 
 ### Prompt arguments
 

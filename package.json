@@ -21,6 +21,7 @@
     "@modelcontextprotocol/server": "^2.0.0",
     "@sparticuz/chromium-min": "^133.0.0",
     "@uiw/react-codemirror": "^4.25.11",
+    "@vercel/blob": "^2.8.0",
     "github-slugger": "^2.0.0",
     "highlight.js": "^11.11.1",
     "marked": "^15.0.12",

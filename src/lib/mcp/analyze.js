@@ -1,4 +1,5 @@
 import { markdownToHtml, extractHeadings, textStats } from '../document/markdown.js';
+import { hasNewpageIal, PAGE_BREAK_LINE_RE, stripNewpageIal } from '../document/pageBreaks.js';
 import { inferTitle } from '../document/utils.js';
 
 /** Codes that are suggestions rather than things that will render wrongly. */
@@ -96,7 +97,11 @@ export function analyzeMarkdown(markdown, opts = {}) {
     const h = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
     if (h) {
       const depth = h[1].length;
-      const text = h[2].replace(/[*_`]/g, '').trim();
+      let text = h[2].replace(/[*_`]/g, '').trim();
+      if (hasNewpageIal(text)) {
+        stats.pageBreaks++;
+        text = stripNewpageIal(text).trim();
+      }
       outline.push({ depth, text, line: n });
       if (depth === 1) h1Count++;
       if (prevDepth && depth > prevDepth + 1) {
@@ -150,10 +155,21 @@ export function analyzeMarkdown(markdown, opts = {}) {
       warn('callout-unknown', `Unknown callout type on line ${n}. Supported: NOTE, TIP, IMPORTANT, WARNING, CAUTION.`, n);
     }
 
-    // Page breaks
-    if (/^\s*(\\pagebreak|\\newpage|<!--\s*(pagebreak|page-break|newpage)\s*-->|---pagebreak---)\s*$/i.test(line)) {
+    // Horizontal rules immediately before a heading
+    if (/^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+      let j = i + 1;
+      while (j < lines.length && !lines[j].trim()) j++;
+      if (j < lines.length && /^\s{0,3}#{1,6}\s+/.test(lines[j])) {
+        warn('hr-before-heading', 'Do not put `---` before a heading — H2s already have a rule, so a divider above them looks like a double line. Delete the `---` and leave a blank line.', n);
+      }
+    }
+    if (PAGE_BREAK_LINE_RE.test(line)) {
       stats.pageBreaks++;
-      if ((i > 0 && lines[i - 1].trim()) || (lines[i + 1] || '').trim()) warn('pagebreak-not-isolated', 'Page-break directive must be on its own line with blank lines before and after.', n);
+      const prev = i > 0 ? lines[i - 1] : '';
+      const attachedToHeading = /^\s{0,3}#{1,6}\s+/.test(prev);
+      if (!attachedToHeading && ((i > 0 && prev.trim()) || (lines[i + 1] || '').trim())) {
+        warn('pagebreak-not-isolated', 'Page-break directive must be on its own line with blank lines before and after.', n);
+      }
     }
 
     // Images

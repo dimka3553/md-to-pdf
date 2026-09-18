@@ -1,3 +1,5 @@
+import { stripNewpageIal } from './pageBreaks.js';
+
 export function escapeHtml(text) {
   if (text === null || text === undefined) return '';
   return String(text)
@@ -29,5 +31,5 @@ export function formatDate(date = new Date()) {
 export function inferTitle(markdown, fallback = 'Document') {
   const m = (markdown || '').match(/^\s*#\s+(.+?)\s*#*\s*$/m);
   if (!m) return fallback;
-  return m[1].replace(/[*_`]/g, '').trim() || fallback;
+  return stripNewpageIal(m[1].replace(/[*_`]/g, '')).trim() || fallback;
 }

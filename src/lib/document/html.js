@@ -1,7 +1,7 @@
 import { CODE_FONT, LOGO_SIZES, normalizeSettings, resolveDesign } from './settings.js';
 import { markdownToHtml, extractHeadings } from './markdown.js';
 import { buildStyles } from './styles.js';
-import { preparePagination } from './pagination.js';
+import { preparePagination, splitOverflowingBlock, mergeSplitBlocks } from './pagination.js';
 import { escapeHtml, formatDate, inferTitle } from './utils.js';
 
 const MERMAID_SRC = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
@@ -10,7 +10,7 @@ const MERMAID_SRC = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js
  * Build a complete, self-contained HTML document from markdown + design settings.
  *
  * `mode` is 'preview' for the in-app iframe (adds a paper sheet, simulated
- * running header/footer and page guides) or 'pdf' for Puppeteer (real page
+ * running header/footer and a page gap at every break) or 'pdf' for Puppeteer (real page
  * breaks, running header/footer handled by the PDF engine).
  *
  * @param {{ markdown: string, settings?: object, assets?: Record<string,string>, mode?: 'preview'|'pdf', title?: string }} input
@@ -128,12 +128,13 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
       return window.mermaid.run({ querySelector: '.mermaid' }).catch(function () {});
     } catch (e) { return Promise.resolve(); }
   }
-  var GUTTER = 28, runningOffset = ${Math.round(design.margins.y * 0.55)};
+  var GUTTER = 36, runningOffset = ${Math.round(design.margins.y * 0.55)};
   var perPage = pageH - padTop - padBottom;
   var pageBreaks = ${JSON.stringify(settings.pageBreaks)};
   var doc = document.querySelector('.doc');
 
   function cleanupPagination() {
+    (${mergeSplitBlocks.toString()})(doc);
     Array.prototype.forEach.call(doc.querySelectorAll('.page-gap, .page-guide'), function (n) { n.remove(); });
     Array.prototype.forEach.call(doc.querySelectorAll('[data-pg-mt]'), function (n) { n.style.marginTop = ''; n.removeAttribute('data-pg-mt'); });
     doc.style.paddingBottom = '';
@@ -141,6 +142,8 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
   function keepTogether(el, h) {
     if (h > perPage * 0.9) return false;
     if (el.classList.contains('cover') || el.classList.contains('toc-page')) return false;
+    // Tables fragment between rows (and repeat a real header) the same way Chromium does.
+    if (el.classList.contains('table-wrap')) return false;
     if (el.classList.contains('keep-block')) return true;
     if (/^H[1-6]$/.test(el.tagName) || el.classList.contains('title-block')) return true;
     if (el.matches('figure, blockquote, .markdown-alert, hr, .logo-above')) return true;
@@ -169,7 +172,7 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
       if (el.classList.contains('page-break')) { if (!el.hidden) forceBreak = true; continue; }
       var base = docTop(), r = el.getBoundingClientRect();
       var top = r.top - base, bottom = r.bottom - base, h = bottom - top;
-      var headingBreak = el.classList.contains('heading-page-start');
+      var headingBreak = el.classList.contains('heading-page-start') || el.classList.contains('manual-page-start');
       var startsNewPage = (forceBreak && top > pageTop + 1) || top >= limit - 0.5 || (headingBreak && top > pageTop + 1);
       forceBreak = forceBreak && top > pageTop + 1;
 
@@ -189,9 +192,20 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
         }
       }
 
+      if (!startsNewPage && bottom > limit + 0.5) {
+        var cont = (${splitOverflowingBlock.toString()})(el, limit, base);
+        if (cont) {
+          r = el.getBoundingClientRect();
+          top = r.top - base; bottom = r.bottom - base; h = bottom - top;
+        } else if (top > pageTop + 1) {
+          startsNewPage = true;
+        }
+      }
+
       if (startsNewPage) {
         var gap = document.createElement('div');
         gap.className = 'page-gap' + (forceBreak ? ' manual' : '');
+        gap.setAttribute('data-label', forceBreak ? 'manual page break' : ('page ' + (pageNo + 1)));
         forceBreak = false;
         doc.insertBefore(gap, el);
         el.style.marginTop = '0px'; el.setAttribute('data-pg-mt', '1');
@@ -210,23 +224,10 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
       }
 
       if (el.classList.contains('cover') || el.classList.contains('toc-page')) forceBreak = true;
-
-      // Block flows across page boundaries (long list / table / code): mark each split point.
-      while (bottom > limit + 0.5) {
-        var g = document.createElement('div');
-        g.className = 'page-guide';
-        g.style.top = limit + 'px';
-        g.setAttribute('data-label', 'page ' + (pageNo + 1));
-        doc.appendChild(g);
-        pageNo++;
-        pageTop = limit; limit += perPage;
-      }
     }
     // Pad the last page to full height.
     var last = doc.lastElementChild;
     var lastBottom = last ? last.getBoundingClientRect().bottom - docTop() : 0;
-    var guides = doc.querySelectorAll('.page-guide');
-    if (guides.length) lastBottom = Math.max(lastBottom, parseFloat(guides[guides.length - 1].style.top));
     doc.style.paddingBottom = Math.max(0, limit - lastBottom) + 'px';
     Array.prototype.forEach.call(document.querySelectorAll('.totalPages'), function (n) { n.textContent = pageNo; });
     return pageNo;
