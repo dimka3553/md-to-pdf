@@ -8,7 +8,7 @@
 
 import { ARGUMENT_CATALOG } from './arguments.js';
 
-export const GUIDE_VERSION = '1.6.1';
+export const GUIDE_VERSION = '1.7.0';
 
 export const MARKDOWN_GUIDE = `# Writing Markdown for Markdown Studio
 
@@ -24,7 +24,8 @@ front-matter, custom CSS) does **not**.
 4. Run \`analyze_markdown\` — it returns the outline plus warnings (skipped heading levels, code fences without a language, YAML front-matter, missing images, ragged tables…). Fix everything it reports.
 5. **Ask for styles every time** — list theme, paper, fonts, TOC, cover, header/footer and the other knobs (full list at the end of this guide) and wait for an answer before \`render_pdf\`. Recommend a starting set. Default chrome is **no running header**: do not put the title (or \`{title}\`) at the top of every page; the H1 already prints once. See *Before rendering*.
 6. Render with \`render_pdf\` (or \`render_html\` for a quick look). Pass \`markdown\`, \`settings\`, optional \`assets\` and \`fileName\`.
-7. **Give the user the download URL** from the \`render_pdf\` text result (\`https://<host>/d/<id>.pdf\`, valid 24 hours). Do not expect a base64 PDF attachment. See *After rendering* at the end of this guide.
+7. **Read the LAYOUT REPORT** in the \`render_pdf\` result. It lists every page, the y-position of each block (percent from the top), how it looks (heading/table/callout, colours, sizes), where page breaks happened and why, plus warnings (stranded headings, sparse pages, clipped tables). Use that to fix pagination — do **not** screenshot the PDF or open it in a browser to find breaks.
+8. **Give the user the download URL** from the \`render_pdf\` text result (\`https://<host>/d/<id>.pdf\`, valid 24 hours). Do not expect a base64 PDF attachment. See *After rendering* at the end of this guide.
 
 ## Document structure
 
@@ -178,7 +179,7 @@ All amounts are in USD per month.
 
 The marker is invisible in the PDF; the editor toolbar's **Page break** button inserts it. \`\\newpage\`, \`<!-- page-break -->\`, \`<!-- newpage -->\`, \`---pagebreak---\`, and \`{: .newpage }\` (on a heading, immediately under a heading, or on its own line) are aliases. \`{:.newpage}\`, \`{: .pagebreak }\` and \`{: .page-break }\` work too. Markers inside code examples are literal text. \`---\` is a visual divider, not a page break.
 
-After rendering, inspect the actual PDF page transitions. If a section needs an editorial break, insert the marker before its heading and render again. Do not guess page positions from Markdown line counts or pad with blank lines. Recheck manual breaks after changing paper, fonts, margins or content. \`analyze_markdown\` checks syntax, not physical page layout; the live preview shows a page at every split, while the PDF is authoritative.
+After rendering, read the LAYOUT REPORT from \`render_pdf\` (it is the physical page map). If a section needs an editorial break, insert the marker before its heading and render again. Do not guess page positions from Markdown line counts, pad with blank lines, or screenshot the PDF. Recheck the report after changing paper, fonts, margins or content. \`analyze_markdown\` checks syntax, not physical page layout.
 
 ### Horizontal rule
 

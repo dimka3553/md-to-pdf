@@ -1,5 +1,9 @@
 import { buildDocumentHtml, buildPdfPageOptions } from '../document/html.js';
+import { resolveDesign } from '../document/settings.js';
 import { withBrowser } from './browser.js';
+import { extractPdfLayout } from './extract.js';
+import { collectDomSnapshot } from './inspect.js';
+import { buildLayoutReport } from './layout.js';
 
 // Vercel kills the function at maxDuration (60s). These waits have to fit after Chromium launch.
 const CONTENT_TIMEOUT_MS = 15_000;
@@ -7,13 +11,14 @@ const READY_TIMEOUT_MS = 10_000;
 const PDF_TIMEOUT_MS = 25_000;
 
 /**
- * Render markdown + settings to a PDF buffer.
- * @param {{ markdown: string, settings?: object, assets?: Record<string,string>, title?: string }} input
- * @returns {Promise<{ pdf: Buffer, title: string }>}
+ * Render markdown + settings to a PDF buffer plus an agent-facing layout report.
+ * @param {{ markdown: string, settings?: object, assets?: Record<string,string>, title?: string, includeLayout?: boolean }} input
+ * @returns {Promise<{ pdf: Buffer, title: string, layout?: object }>}
  */
-export async function renderPdf({ markdown, settings, assets, title }) {
+export async function renderPdf({ markdown, settings, assets, title, includeLayout = false }) {
   const html = buildDocumentHtml({ markdown, settings, assets, mode: 'pdf', title });
   const pageOptions = buildPdfPageOptions(settings, markdown, title);
+  const design = resolveDesign(settings);
 
   // withBrowser closes Chromium and removes its temp profile/socket directories afterwards.
   return withBrowser(async (browser) => {
@@ -41,9 +46,37 @@ export async function renderPdf({ markdown, settings, assets, title }) {
         timeout: PDF_TIMEOUT_MS,
       });
 
-      return { pdf: Buffer.from(pdf), title: pageOptions.title };
+      const buffer = Buffer.from(pdf);
+      if (!includeLayout) return { pdf: buffer, title: pageOptions.title };
+      const layout = await describeLayout(page, buffer, { settings, design, title: pageOptions.title });
+      return { pdf: buffer, title: pageOptions.title, layout };
     } finally {
       await page.close().catch(() => {});
     }
   });
+}
+
+async function describeLayout(page, pdf, { settings, design, title }) {
+  try {
+    const headerBandPx = design.hasRunningHeader ? Math.round(design.margins.y * 0.55) + 18 : 8;
+    const footerBandPx = design.hasRunningFooter ? Math.round(design.margins.y * 0.55) + 18 : 8;
+    const [printed, dom] = await Promise.all([
+      extractPdfLayout(pdf, {
+        pageWidth: design.pageWidth,
+        pageHeight: design.pageHeight,
+        headerBandPx,
+        footerBandPx,
+      }),
+      page.evaluate(collectDomSnapshot),
+    ]);
+    return buildLayoutReport({ printed, dom, settings, design, title });
+  } catch (err) {
+    console.error('[pdf] layout report failed:', err);
+    return {
+      pageCount: 0,
+      pages: [],
+      issues: [{ severity: 'warning', code: 'layout-unavailable', message: err.message }],
+      text: `Layout report unavailable (${err.message}). Download the PDF to inspect page breaks.\n`,
+    };
+  }
 }

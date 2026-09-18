@@ -47,7 +47,7 @@ Streamable HTTP, stateless, no sign-up. It teaches the agent the exact syntax th
 | `import_web_page` | Turn a public URL into clean Markdown (or HTML): rendered in headless Chromium (JavaScript executed, lazy content scrolled in), chrome stripped using the rendered layout, tables/code/callouts/figures preserved, absolute links, page metadata and the same analysis as `analyze_markdown`. Options `format`, `stripImages`, `stripLinks` |
 | `analyze_markdown` | Linter: outline, stats and line-numbered warnings (skipped heading levels, fences without a language, YAML front-matter, LaTeX, raw HTML, ragged tables, missing assets, undefined footnotes…) |
 | `render_html` | Standalone HTML with the same CSS as the PDF (fast, no browser) |
-| `render_pdf` | The PDF, stored for 24 hours. The tool result text contains `https://<host>/d/<id>.pdf` (and an MCP `resource_link`). Give the user that URL; in Cursor, open it in a canvas iframe. No base64 attachment |
+| `render_pdf` | The PDF, stored for 24 hours. The tool result text contains `https://<host>/d/<id>.pdf` (and an MCP `resource_link`) **plus a LAYOUT REPORT**: every page, y% of each block, appearance, page-break reasons and warnings. Read that report instead of screenshotting. Give the user the URL; in Cursor, open it in a canvas iframe. No base64 attachment |
 
 Also exposed: resources `markdown-studio://guide`, `markdown-studio://design-options`, `markdown-studio://templates/{id}` and prompts `write_document`, `polish_markdown`, `make_pdf`, `pdf_from_url` (import a page → clean up → render).
 
@@ -145,7 +145,7 @@ All amounts are in USD per month.
 
 The toolbar's **Page break** button inserts this marker. It is invisible in the PDF. `\newpage`, `<!-- page-break -->`, `<!-- newpage -->`, `---pagebreak---`, and `{: .newpage }` (on a heading or its own line) are also supported; code examples remain literal. `---` alone is a divider, not a page break. Use `settings.pageBreaks: "h1"` or `"h2"` to start every H1 or H1/H2 on a new page.
 
-Check the PDF after changing content or design settings. The live preview shows a full page at every break, including inside long tables, lists and code. The MCP guide and generated agent skill explain the same rules, and `analyze_markdown` checks marker syntax rather than physical page positions.
+Check the LAYOUT REPORT from `render_pdf` after changing content or design settings (it lists every page break and where each block landed). The live preview shows a full page at every break, including inside long tables, lists and code. The MCP guide and generated agent skill explain the same rules, and `analyze_markdown` checks marker syntax rather than physical page positions.
 
 ### `POST /api/convert`
 

@@ -34,7 +34,7 @@ Markdown Studio exposes a remote MCP server at \`${MCP_URL}\` (Streamable HTTP, 
 | \`import_web_page\` | Turn a public URL into clean Markdown + metadata + analysis (\`url\`, \`format\`, \`stripImages\`, \`stripLinks\`) |
 | \`analyze_markdown\` | Lint before rendering; fix every warning it reports |
 | \`render_html\` | Quick standalone HTML preview (\`markdown\`, \`settings\`, \`assets\`, \`fileName\`) |
-| \`render_pdf\` | Final PDF as a 24-hour download URL in the text (\`https://<host>/d/<id>.pdf\`) plus an MCP \`resource_link\` — not a base64 attachment. Give the user that URL right away (Cursor: canvas iframe src = the URL) |
+| \`render_pdf\` | Final PDF as a 24-hour download URL in the text (\`https://<host>/d/<id>.pdf\`) plus an MCP \`resource_link\` **and a LAYOUT REPORT** (every page, y% of each block, appearance, break reasons, warnings). Read the report instead of screenshotting. Give the user that URL right away (Cursor: canvas iframe src = the URL) |
 
 Prompts: \`write_document\`, \`polish_markdown\`, \`make_pdf\` (walk through every design argument, then render), \`pdf_from_url\` (import a page, clean it up, render).
 

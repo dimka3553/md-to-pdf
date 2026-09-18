@@ -3,7 +3,7 @@ name: markdown-studio
 description: Write well-formatted Markdown documents and export them as polished PDFs with Markdown Studio. Use when asked to write, format, polish or export a report, proposal, README, meeting notes, invoice, résumé or any document destined for PDF/print, or when Markdown must render correctly in Markdown Studio (md-to-pdf).
 ---
 
-<!-- Generated from src/lib/mcp/guide.js (v1.6.1) by scripts/build-skill.mjs — do not edit by hand. -->
+<!-- Generated from src/lib/mcp/guide.js (v1.7.0) by scripts/build-skill.mjs — do not edit by hand. -->
 
 ## Tooling
 
@@ -17,7 +17,7 @@ Markdown Studio exposes a remote MCP server at `https://md.dima.ua/api/mcp` (Str
 | `import_web_page` | Turn a public URL into clean Markdown + metadata + analysis (`url`, `format`, `stripImages`, `stripLinks`) |
 | `analyze_markdown` | Lint before rendering; fix every warning it reports |
 | `render_html` | Quick standalone HTML preview (`markdown`, `settings`, `assets`, `fileName`) |
-| `render_pdf` | Final PDF as a 24-hour download URL in the text (`https://<host>/d/<id>.pdf`) plus an MCP `resource_link` — not a base64 attachment. Give the user that URL right away (Cursor: canvas iframe src = the URL) |
+| `render_pdf` | Final PDF as a 24-hour download URL in the text (`https://<host>/d/<id>.pdf`) plus an MCP `resource_link` **and a LAYOUT REPORT** (every page, y% of each block, appearance, break reasons, warnings). Read the report instead of screenshotting. Give the user that URL right away (Cursor: canvas iframe src = the URL) |
 
 Prompts: `write_document`, `polish_markdown`, `make_pdf` (walk through every design argument, then render), `pdf_from_url` (import a page, clean it up, render).
 
@@ -47,7 +47,8 @@ front-matter, custom CSS) does **not**.
 4. Run `analyze_markdown` — it returns the outline plus warnings (skipped heading levels, code fences without a language, YAML front-matter, missing images, ragged tables…). Fix everything it reports.
 5. **Ask for styles every time** — list theme, paper, fonts, TOC, cover, header/footer and the other knobs (full list at the end of this guide) and wait for an answer before `render_pdf`. Recommend a starting set. Default chrome is **no running header**: do not put the title (or `{title}`) at the top of every page; the H1 already prints once. See *Before rendering*.
 6. Render with `render_pdf` (or `render_html` for a quick look). Pass `markdown`, `settings`, optional `assets` and `fileName`.
-7. **Give the user the download URL** from the `render_pdf` text result (`https://<host>/d/<id>.pdf`, valid 24 hours). Do not expect a base64 PDF attachment. See *After rendering* at the end of this guide.
+7. **Read the LAYOUT REPORT** in the `render_pdf` result. It lists every page, the y-position of each block (percent from the top), how it looks (heading/table/callout, colours, sizes), where page breaks happened and why, plus warnings (stranded headings, sparse pages, clipped tables). Use that to fix pagination — do **not** screenshot the PDF or open it in a browser to find breaks.
+8. **Give the user the download URL** from the `render_pdf` text result (`https://<host>/d/<id>.pdf`, valid 24 hours). Do not expect a base64 PDF attachment. See *After rendering* at the end of this guide.
 
 ## Document structure
 
@@ -201,7 +202,7 @@ All amounts are in USD per month.
 
 The marker is invisible in the PDF; the editor toolbar's **Page break** button inserts it. `\newpage`, `<!-- page-break -->`, `<!-- newpage -->`, `---pagebreak---`, and `{: .newpage }` (on a heading, immediately under a heading, or on its own line) are aliases. `{:.newpage}`, `{: .pagebreak }` and `{: .page-break }` work too. Markers inside code examples are literal text. `---` is a visual divider, not a page break.
 
-After rendering, inspect the actual PDF page transitions. If a section needs an editorial break, insert the marker before its heading and render again. Do not guess page positions from Markdown line counts or pad with blank lines. Recheck manual breaks after changing paper, fonts, margins or content. `analyze_markdown` checks syntax, not physical page layout; the live preview shows a page at every split, while the PDF is authoritative.
+After rendering, read the LAYOUT REPORT from `render_pdf` (it is the physical page map). If a section needs an editorial break, insert the marker before its heading and render again. Do not guess page positions from Markdown line counts, pad with blank lines, or screenshot the PDF. Recheck the report after changing paper, fonts, margins or content. `analyze_markdown` checks syntax, not physical page layout.
 
 ### Horizontal rule
 
@@ -317,6 +318,7 @@ The moment the tool returns, show that URL to the user — automatically, withou
    - **Claude Desktop / claude.ai / ChatGPT:** present the markdown link. If you have a files/outputs tool, you may download the URL into that folder and attach the saved file — do not retype the PDF, do not paste the styled HTML as a substitute, and do not POST to `/api/convert` unless the user is on a host that can reach it.
    - **CLI with a writable disk and egress to the host:** `curl -L -o <fileName> '<downloadUrl>'` and print the path.
 3. Confirm the file name, theme, paper and that the link expires in 24 hours. When the user asks for changes, re-render and replace the previous link (and the same canvas, in Cursor).
+4. **Judge layout from the LAYOUT REPORT** in the same tool result (pages, y% of every block, appearance, break reasons, warnings). Do not screenshot the PDF, rasterise it, or open it in a browser to find page breaks. Only peek visually if a logo, diagram or colour is still unclear after reading the report.
 
 If you need a quick look at styling without a PDF, call `render_html` (`text/html` usually passes through). Do not rebuild the PDF in a local browser to work around a missing blob.
 
@@ -380,7 +382,7 @@ Use it whenever the user hands you a URL. Then polish the Markdown (fix the repo
 
 ### `render_pdf` / `render_html`
 
-Same arguments. `render_pdf` uses headless Chromium (3–15 s) and returns a 24-hour download URL in the text (`https://<host>/d/<id>.pdf`) plus an MCP `resource_link` — not a base64 PDF. Do not call it until you have listed style options and the user has answered. `render_html` is fast and returns standalone HTML with the same CSS. As soon as `render_pdf` returns, give the user that URL (see **After rendering** above).
+Same arguments. `render_pdf` uses headless Chromium (3–15 s) and returns a 24-hour download URL in the text (`https://<host>/d/<id>.pdf`) plus an MCP `resource_link` — not a base64 PDF — **and a LAYOUT REPORT**: page count, every block's kind/text/y% from the top of its page, colours and sizes, where each page break happened and why, plus warnings (stranded headings, sparse pages, overflowing tables). Read the report instead of screenshotting. Do not call `render_pdf` until you have listed style options and the user has answered. `render_html` is fast and returns standalone HTML with the same CSS (no page map — pagination exists only in the PDF). As soon as `render_pdf` returns, give the user that URL (see **After rendering** above).
 
 | Argument | Required | Meaning |
 | --- | --- | --- |
@@ -404,7 +406,7 @@ Every key is optional. Unknown keys are ignored. Nested objects are merged field
 | `orientation` | enum | `portrait` | "portrait" or "landscape". Default "portrait". Use landscape for wide tables. |
 | `margins` | enum | `normal` | Page margins: "narrow" (Narrow), "normal" (Normal), "wide" (Wide). Default "normal". |
 | `background` | enum | `none` | Subtle full-page texture: "none" (None), "soft" (Soft tint), "gradient" (Gradient), "dots" (Dots), "grid" (Grid), "lines" (Ruled lines). Default "none". |
-| `pageBreaks` | enum | `auto` | Pagination: "auto" (Automatic), "h1" (Before each H1), "h2" (Before each H1 & H2). Default "auto". Auto keeps headings and short introductions with compact tables/blocks, and the opening rows of longer tables. For an editorial break, put \pagebreak on a separate paragraph BEFORE the section heading, or `{: .newpage }` at the end of the heading line. Inspect the rendered PDF after layout changes. |
+| `pageBreaks` | enum | `auto` | Pagination: "auto" (Automatic), "h1" (Before each H1), "h2" (Before each H1 & H2). Default "auto". Auto keeps headings and short introductions with compact tables/blocks, and the opening rows of longer tables. For an editorial break, put \pagebreak on a separate paragraph BEFORE the section heading, or `{: .newpage }` at the end of the heading line. After render_pdf, read the LAYOUT REPORT (not screenshots) to see where breaks landed. |
 | `toc` | boolean | false | Insert a generated table of contents from ## / ### (after the title, or on its own page when a cover is on). Default false. Do not write a TOC by hand. |
 | `headingNumbers` | boolean | false | Auto-number H1–H3 as 1 / 1.1 / 1.1.1. Default false. Do not number headings by hand. |
 | `justify` | boolean | false | Justify body paragraphs. Default false. |

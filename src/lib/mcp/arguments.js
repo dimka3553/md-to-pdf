@@ -71,7 +71,7 @@ export const FIELD_HELP = {
     .join(', ')}. Default "${DEFAULT_SETTINGS.background}".`,
   pageBreaks: `Pagination: ${Object.entries(PAGE_BREAK_MODES)
     .map(([k, v]) => `"${k}" (${v.name})`)
-    .join(', ')}. Default "${DEFAULT_SETTINGS.pageBreaks}". Auto keeps headings and short introductions with compact tables/blocks, and the opening rows of longer tables. For an editorial break, put \\pagebreak on a separate paragraph BEFORE the section heading, or \`{: .newpage }\` at the end of the heading line. Inspect the rendered PDF after layout changes.`,
+    .join(', ')}. Default "${DEFAULT_SETTINGS.pageBreaks}". Auto keeps headings and short introductions with compact tables/blocks, and the opening rows of longer tables. For an editorial break, put \\pagebreak on a separate paragraph BEFORE the section heading, or \`{: .newpage }\` at the end of the heading line. After render_pdf, read the LAYOUT REPORT (not screenshots) to see where breaks landed.`,
   toc: `Insert a generated table of contents from ## / ### (after the title, or on its own page when a cover is on). Default ${DEFAULT_SETTINGS.toc}. Do not write a TOC by hand.`,
   headingNumbers: `Auto-number H1–H3 as 1 / 1.1 / 1.1.1. Default ${DEFAULT_SETTINGS.headingNumbers}. Do not number headings by hand.`,
   justify: `Justify body paragraphs. Default ${DEFAULT_SETTINGS.justify}.`,
@@ -143,6 +143,7 @@ The moment the tool returns, show that URL to the user — automatically, withou
    - **Claude Desktop / claude.ai / ChatGPT:** present the markdown link. If you have a files/outputs tool, you may download the URL into that folder and attach the saved file — do not retype the PDF, do not paste the styled HTML as a substitute, and do not POST to \`/api/convert\` unless the user is on a host that can reach it.
    - **CLI with a writable disk and egress to the host:** \`curl -L -o <fileName> '<downloadUrl>'\` and print the path.
 3. Confirm the file name, theme, paper and that the link expires in 24 hours. When the user asks for changes, re-render and replace the previous link (and the same canvas, in Cursor).
+4. **Judge layout from the LAYOUT REPORT** in the same tool result (pages, y% of every block, appearance, break reasons, warnings). Do not screenshot the PDF, rasterise it, or open it in a browser to find page breaks. Only peek visually if a logo, diagram or colour is still unclear after reading the report.
 
 If you need a quick look at styling without a PDF, call \`render_html\` (\`text/html\` usually passes through). Do not rebuild the PDF in a local browser to work around a missing blob.`;
 
@@ -263,7 +264,7 @@ Use it whenever the user hands you a URL. Then polish the Markdown (fix the repo
 
 ### \`render_pdf\` / \`render_html\`
 
-Same arguments. \`render_pdf\` uses headless Chromium (3–15 s) and returns a 24-hour download URL in the text (\`https://<host>/d/<id>.pdf\`) plus an MCP \`resource_link\` — not a base64 PDF. Do not call it until you have listed style options and the user has answered. \`render_html\` is fast and returns standalone HTML with the same CSS. As soon as \`render_pdf\` returns, give the user that URL (see **After rendering** above).
+Same arguments. \`render_pdf\` uses headless Chromium (3–15 s) and returns a 24-hour download URL in the text (\`https://<host>/d/<id>.pdf\`) plus an MCP \`resource_link\` — not a base64 PDF — **and a LAYOUT REPORT**: page count, every block's kind/text/y% from the top of its page, colours and sizes, where each page break happened and why, plus warnings (stranded headings, sparse pages, overflowing tables). Read the report instead of screenshotting. Do not call \`render_pdf\` until you have listed style options and the user has answered. \`render_html\` is fast and returns standalone HTML with the same CSS (no page map — pagination exists only in the PDF). As soon as \`render_pdf\` returns, give the user that URL (see **After rendering** above).
 
 | Argument | Required | Meaning |
 | --- | --- | --- |

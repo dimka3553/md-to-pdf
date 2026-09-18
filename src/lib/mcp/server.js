@@ -36,7 +36,7 @@ Recommended flow:
 2. Optionally call list_templates / get_template for a proven structure and matching design settings.
 3. List style options, recommend a starting set (empty running header), and wait. Do not call render_pdf until they pick or say you may decide.
 4. Write the Markdown, then call analyze_markdown and fix every warning. Default to automatic pagination; for deliberate section boundaries put \\pagebreak on its own paragraph BEFORE the heading (or \`{: .newpage }\` on the heading), never between its introduction and table. Do not put \`---\` above headings — H2s already have a rule. See the guide's Page breaks rules.
-5. Call render_pdf (returns a 24-hour download URL in the text, not a base64 PDF) or render_html. Inspect PDF page transitions and re-render with explicit breaks where needed; analyze_markdown cannot assess physical page layout.
+5. Call render_pdf (returns a 24-hour download URL in the text, not a base64 PDF) or render_html. Read the LAYOUT REPORT in the result — it lists every page, where each block sits (y% from the top), how it looks (type, colour, size), and where page breaks happened. Fix stranded headings or sparse pages with \\pagebreak / \`{: .newpage }\` and re-render. Do not screenshot the PDF (or open it in a browser) to find page breaks; analyze_markdown cannot assess physical page layout.
 6. Immediately give the user that download URL (markdown link). In Cursor, also open it in a canvas whose iframe src is the URL. Details under "After rendering" below.
 All tools are stateless; pass the full markdown each time.
 
@@ -302,7 +302,7 @@ export function registerMarkdownStudio(server) {
     {
       title: 'Render PDF',
       description:
-        'Render Markdown + settings to a PDF with headless Chromium (takes 3–15 s). Do not call this until you have listed style options (theme, paper, fonts, TOC, cover, header/footer) and the user has answered — every time, including re-renders. Default: no running header; do not put the document title or {title} on every page. Arguments: markdown (required), settings (optional design object — every field is documented on the schema and in get_markdown_guide), assets (optional image data URLs), fileName (optional, no extension). Returns a 24-hour https download URL in the text block (and an MCP resource_link) — not a base64 application/pdf attachment. Give the user that URL as a markdown link. In Cursor, open it in a canvas iframe whose src is the URL. Run analyze_markdown first and fix its warnings.',
+        'Render Markdown + settings to a PDF with headless Chromium (takes 3–15 s). Do not call this until you have listed style options (theme, paper, fonts, TOC, cover, header/footer) and the user has answered — every time, including re-renders. Default: no running header; do not put the document title or {title} on every page. Arguments: markdown (required), settings (optional design object — every field is documented on the schema and in get_markdown_guide), assets (optional image data URLs), fileName (optional, no extension). Returns a 24-hour https download URL in the text block (and an MCP resource_link) — not a base64 application/pdf attachment — plus a LAYOUT REPORT: every page, y% position of each block, appearance (heading/table/callout/…, colours, sizes), page-break reasons and layout warnings. Read that report to judge pagination; do not screenshot the PDF. Give the user the URL as a markdown link. In Cursor, open it in a canvas iframe whose src is the URL. Run analyze_markdown first and fix its warnings.',
       inputSchema: renderInput,
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
     },
@@ -318,7 +318,7 @@ export function registerMarkdownStudio(server) {
       const requested = fileName ? String(fileName).slice(0, 120) : '';
       const started = Date.now();
       try {
-        const { pdf, title } = await renderPdf({ markdown, settings: normalized, assets: cleanAssets, title: requested });
+        const { pdf, title, layout } = await renderPdf({ markdown, settings: normalized, assets: cleanAssets, title: requested, includeLayout: true });
         const name = safeFileName(requested || title, 'pdf');
         const seconds = ((Date.now() - started) / 1000).toFixed(1);
         const kb = (pdf.length / 1024).toFixed(0);
@@ -331,12 +331,16 @@ export function registerMarkdownStudio(server) {
         }
         const extras = [normalized.toc ? 'TOC' : '', normalized.cover.enabled ? 'cover page' : ''].filter(Boolean);
         const extra = extras.length ? `, ${extras.join(', ')}` : '';
+        const pages = layout?.pageCount ? `${layout.pageCount} page${layout.pageCount === 1 ? '' : 's'}` : '';
         const summary = [
-          `Rendered "${name}" — ${kb} KB in ${seconds}s (theme "${normalized.theme}", ${normalized.paperSize} ${normalized.orientation}${extra}).`,
+          `Rendered "${name}" — ${kb} KB in ${seconds}s (${pages ? `${pages}, ` : ''}theme "${normalized.theme}", ${normalized.paperSize} ${normalized.orientation}${extra}).`,
           `Download (expires in 24h): ${download.url}`,
           '',
           `Give the user that URL as a markdown link named "${name}". Do not wait for an attached application/pdf blob — many clients drop those, and this tool does not send one. There is nothing to decode with base64. If this client can show PDFs inline, open the URL there (Cursor: a canvas with <iframe src="${download.url}">). If it cannot, the link is the deliverable.`,
           '',
+          'Read the LAYOUT REPORT below to judge page breaks, placement and styling. Do not screenshot the PDF or render it in a browser unless a logo, diagram or colour is still unclear. If a heading is stranded or a page is too empty, insert \\pagebreak / {: .newpage } before the section heading (or change settings) and call render_pdf again.',
+          '',
+          layout?.text || 'Layout report unavailable.',
         ].join('\n');
         return {
           content: [
@@ -359,6 +363,9 @@ export function registerMarkdownStudio(server) {
             settings: normalized,
             downloadUrl: download.url,
             expiresAt: new Date(download.expiresAt).toISOString(),
+            pageCount: layout?.pageCount || 0,
+            layoutIssues: layout?.issues || [],
+            pages: layout?.pages || [],
           },
         };
       } catch (error) {
@@ -507,7 +514,7 @@ export function registerMarkdownStudio(server) {
               '- Do not write a manual table of contents or number headings by hand; use settings.toc / settings.headingNumbers.',
               '- Before render_pdf: list style options (theme, paper, fonts, TOC, cover, header/footer), recommend a starting set with an empty running header, and wait for the user. Never put the H1/{title} in header.text.',
               '- Run analyze_markdown and fix every warning before rendering.',
-              '- Finish by calling render_pdf with the chosen settings, then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL) and report the file name.',
+              '- Finish by calling render_pdf with the chosen settings. Read the LAYOUT REPORT (do not screenshot the PDF). Then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL) and report the file name.',
             ].join('\n'),
           },
         },
@@ -575,7 +582,7 @@ export function registerMarkdownStudio(server) {
               '3. Add a closing line or footnote with the source URL and the import date.',
               '4. Run analyze_markdown until there are no warnings.',
               '5. List design options (theme, paper, TOC, header/footer, page numbers) and wait — pick "clean" + toc for docs, "editorial" for long-form articles. Default: no running header (do not put the article title or site name on every page). Apply what they confirm.',
-              '6. Call render_pdf with markdown + settings + fileName (use the suggested fileName), then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL) and report the result.',
+              '6. Call render_pdf with markdown + settings + fileName (use the suggested fileName). Read the LAYOUT REPORT instead of screenshotting. Then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL) and report the result.',
             ]
               .filter(Boolean)
               .join('\n'),
@@ -616,7 +623,7 @@ export function registerMarkdownStudio(server) {
               '- Chrome: header.text (default empty — do not repeat the title), header.showDate, footer.text, footer.pageNumbers, footer.pageNumberStyle, logo',
               '- Output: fileName; optional assets for local images',
               'Recommend a recipe for this document type with an empty running header (do not repeat the H1 on every page). Wait for them to pick or say you may decide, then apply that.',
-              'Follow the authoring guide (no `---` above headings). Run analyze_markdown and fix warnings. Call render_pdf with markdown + settings + assets + fileName, then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL). Tell them the file name and which settings you used.',
+              'Follow the authoring guide (no `---` above headings). Run analyze_markdown and fix warnings. Call render_pdf with markdown + settings + assets + fileName. Read the LAYOUT REPORT (do not screenshot the PDF). Then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL). Tell them the file name and which settings you used.',
             ]
               .filter(Boolean)
               .join('\n'),
