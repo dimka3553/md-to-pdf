@@ -4,10 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import puppeteerCore from 'puppeteer-core';
 
-// Must match the @sparticuz/chromium-min major version in package.json.
-const REMOTE_CHROMIUM_PACK = 'https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar';
-
 const COMMON_ARGS = ['--no-sandbox', '--disable-setuid-sandbox', '--font-render-hinting=none', '--disable-dev-shm-usage'];
+const LAUNCH_TIMEOUT_MS = 25_000;
 
 /**
  * Temp-file hygiene.
@@ -36,8 +34,14 @@ const RM_OPTIONS = { recursive: true, force: true, maxRetries: 3, retryDelay: 10
 // Survives Next.js HMR module re-evaluation, so the exit hook is registered exactly once and the
 // live-session set is shared across module instances.
 const STATE_KEY = Symbol.for('markdown-studio.chromium-sessions');
-/** @type {{ live: Set<string>, hooked: boolean, sweptAt: number }} */
-const state = (globalThis[STATE_KEY] ??= { live: new Set(), hooked: false, sweptAt: 0 });
+/** @type {{ live: Set<string>, hooked: boolean, sweptAt: number, executablePath: string | null, executablePathPromise: Promise<string> | null }} */
+const state = (globalThis[STATE_KEY] ??= {
+  live: new Set(),
+  hooked: false,
+  sweptAt: 0,
+  executablePath: null,
+  executablePathPromise: null,
+});
 
 function installExitHook() {
   if (state.hooked) return;
@@ -137,13 +141,48 @@ async function sweepOrphans() {
   );
 }
 
+async function withTimeout(promise, ms, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Decompress the bundled serverless Chromium once per isolate. Warm invocations reuse /tmp.
+ * @param {typeof import('@sparticuz/chromium').default} chromium
+ */
+async function serverlessExecutablePath(chromium) {
+  if (state.executablePath) return state.executablePath;
+  if (!state.executablePathPromise) {
+    state.executablePathPromise = chromium
+      .executablePath()
+      .then((p) => {
+        state.executablePath = p;
+        return p;
+      })
+      .catch((err) => {
+        state.executablePathPromise = null;
+        throw err;
+      });
+  }
+  return state.executablePathPromise;
+}
+
 async function launchServerless(userDataDir) {
-  const chromium = (await import('@sparticuz/chromium-min')).default;
-  const executablePath = await chromium.executablePath(REMOTE_CHROMIUM_PACK);
+  const mod = await import('@sparticuz/chromium');
+  const chromium = mod.default ?? mod;
+  chromium.setGraphicsMode = false;
+  const executablePath = await serverlessExecutablePath(chromium);
   return puppeteerCore.launch({
     executablePath,
     args: [...chromium.args, ...COMMON_ARGS],
-    headless: true,
+    headless: chromium.headless,
     userDataDir,
     defaultViewport: { width: 1280, height: 1024 },
   });
@@ -151,8 +190,8 @@ async function launchServerless(userDataDir) {
 
 /**
  * Launch Chromium. On Vercel (or when PUPPETEER_EXECUTABLE_PATH is unset and
- * no local Chrome is found) the serverless chromium pack is used; locally we
- * prefer an installed Chrome so `npm run dev` works with zero setup.
+ * no local Chrome is found) the bundled `@sparticuz/chromium` binary is used;
+ * locally we prefer an installed Chrome so `npm run dev` works with zero setup.
  *
  * Prefer {@link withBrowser}, which also guarantees the temp directories are removed.
  * @param {{ userDataDir?: string }} [options]
@@ -179,12 +218,8 @@ export async function launchBrowser({ userDataDir } = {}) {
 
 /** Close gracefully; if Chromium does not exit in time, kill it so the directories can be removed. */
 async function closeBrowser(browser) {
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('browser.close timed out')), CLOSE_TIMEOUT_MS);
-  });
   try {
-    await Promise.race([browser.close(), timeout]);
+    await withTimeout(browser.close(), CLOSE_TIMEOUT_MS, 'browser.close timed out');
   } catch {
     try {
       browser.process()?.kill('SIGKILL');
@@ -192,8 +227,6 @@ async function closeBrowser(browser) {
       /* already gone */
     }
     await new Promise((r) => setTimeout(r, 250));
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -214,7 +247,11 @@ export async function withBrowser(fn) {
   let browser;
   let socketDir = null;
   try {
-    browser = await launchBrowser({ userDataDir: profileDir });
+    browser = await withTimeout(
+      launchBrowser({ userDataDir: profileDir }),
+      LAUNCH_TIMEOUT_MS,
+      'Timed out launching Chromium',
+    );
     socketDir = await singletonSocketDir(profileDir);
     if (socketDir) {
       state.live.add(socketDir);

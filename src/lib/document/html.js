@@ -114,16 +114,23 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
   var dark = ${t.dark ? 'true' : 'false'};
   var pageH = ${design.pageHeight}, preview = ${isPreview ? 'true' : 'false'};
   var padTop = ${design.margins.y + (design.hasRunningHeader ? 30 : 0)}, padBottom = ${design.margins.y + (design.hasRunningFooter ? 30 : 0)};
+  function withTimeout(promise, ms) {
+    return Promise.race([promise, new Promise(function (res) { setTimeout(res, ms); })]);
+  }
   function whenImages() {
+    var wait = preview ? 8000 : 4000;
     var imgs = Array.prototype.slice.call(document.images);
     return Promise.all(imgs.map(function (img) {
       if (img.complete) return Promise.resolve();
-      return new Promise(function (res) { img.addEventListener('load', res); img.addEventListener('error', res); });
+      return withTimeout(new Promise(function (res) {
+        img.addEventListener('load', res);
+        img.addEventListener('error', res);
+      }), wait);
     }));
   }
   function whenFonts() {
     if (!document.fonts || !document.fonts.ready) return Promise.resolve();
-    return document.fonts.ready;
+    return withTimeout(document.fonts.ready, preview ? 8000 : 4000);
   }
   function whenMermaid() {
     if (!window.mermaid) return Promise.resolve();
@@ -136,7 +143,7 @@ ${needsMermaid ? `<script src="${MERMAID_SRC}"></script>` : ''}
         themeVariables: { fontFamily: family },
         flowchart: { htmlLabels: true, padding: 12 },
       });
-      return window.mermaid.run({ querySelector: '.mermaid' }).catch(function () {});
+      return withTimeout(window.mermaid.run({ querySelector: '.mermaid' }).catch(function () {}), preview ? 8000 : 6000);
     } catch (e) { return Promise.resolve(); }
   }
   var GUTTER = 36, runningOffset = ${Math.round(design.margins.y * 0.55)};

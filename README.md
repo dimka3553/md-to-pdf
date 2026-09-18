@@ -117,7 +117,7 @@ npm run dev
 
 `npm test` runs parser checks and real Chromium PDF pagination regressions (using the same local Chrome setup as PDF export). `npm run lint` and `npm run build` check the app.
 
-PDFs are rendered with headless Chromium. Locally, an installed Google Chrome is used automatically (or set `PUPPETEER_EXECUTABLE_PATH`). On Vercel/Lambda, `@sparticuz/chromium-min` downloads a matching Chromium build at runtime.
+PDFs are rendered with headless Chromium. Locally, an installed Google Chrome is used automatically (or set `PUPPETEER_EXECUTABLE_PATH`). On Vercel/Lambda, `@sparticuz/chromium` supplies a matching Chromium build from the function bundle (no runtime download).
 
 Environment variables (all optional): `NEXT_PUBLIC_SITE_URL` (public URL used in metadata and MCP responses), `MCP_API_KEY` (protects `/api/mcp`), `PUPPETEER_EXECUTABLE_PATH`. On Vercel, connect a **private** Blob store to the project so `render_pdf` can persist files; the SDK uses `BLOB_STORE_ID` + OIDC. Locally, PDFs are written under `DOWNLOAD_DIR` or the OS temp directory.
 
