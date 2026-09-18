@@ -3,7 +3,7 @@ name: markdown-studio
 description: Write well-formatted Markdown documents and export them as polished PDFs with Markdown Studio. Use when asked to write, format, polish or export a report, proposal, README, meeting notes, invoice, résumé or any document destined for PDF/print, or when Markdown must render correctly in Markdown Studio (md-to-pdf).
 ---
 
-<!-- Generated from src/lib/mcp/guide.js (v1.6.0) by scripts/build-skill.mjs — do not edit by hand. -->
+<!-- Generated from src/lib/mcp/guide.js (v1.6.1) by scripts/build-skill.mjs — do not edit by hand. -->
 
 ## Tooling
 
@@ -45,7 +45,7 @@ front-matter, custom CSS) does **not**.
 2. Pick a starting point: `list_templates` → `get_template` gives you proven structure **and** matching design settings for reports, proposals, READMEs, meeting notes, invoices and résumés. If the source is a web page, call `import_web_page` with the URL instead — it returns clean Markdown, metadata and an analysis; never retype page content from memory.
 3. Write the Markdown. One `#` title, `##` sections, short paragraphs, generous use of tables, callouts and code blocks.
 4. Run `analyze_markdown` — it returns the outline plus warnings (skipped heading levels, code fences without a language, YAML front-matter, missing images, ragged tables…). Fix everything it reports.
-5. If the user asked for a nice PDF, tell them the design knobs (theme, paper, TOC, cover, header/footer, fonts) and agree a `settings` object — the full argument list is at the end of this guide.
+5. **Ask for styles every time** — list theme, paper, fonts, TOC, cover, header/footer and the other knobs (full list at the end of this guide) and wait for an answer before `render_pdf`. Recommend a starting set. Default chrome is **no running header**: do not put the title (or `{title}`) at the top of every page; the H1 already prints once. See *Before rendering*.
 6. Render with `render_pdf` (or `render_html` for a quick look). Pass `markdown`, `settings`, optional `assets` and `fileName`.
 7. **Give the user the download URL** from the `render_pdf` text result (`https://<host>/d/<id>.pdf`, valid 24 hours). Do not expect a base64 PDF attachment. See *After rendering* at the end of this guide.
 
@@ -228,7 +228,7 @@ Pass a `settings` object to `render_pdf` / `render_html`. Every key is optional.
   "toc": true,
   "headingNumbers": true,
   "justify": false,
-  "header": { "text": "{title}", "showDate": true },
+  "header": { "text": "", "showDate": false },
   "footer": { "text": "Confidential", "pageNumbers": true, "pageNumberStyle": "n-of-total" },
   "cover": { "enabled": true, "title": "", "subtitle": "Quarterly review", "author": "Strategy team", "date": "Q3 2026", "showLogo": true },
   "logo": { "dataUrl": "data:image/png;base64,…", "position": "title-right", "size": "md" }
@@ -250,14 +250,14 @@ Every nested field, enum, default and tool argument is listed at the end of this
 
 ## Recipes
 
-- **Branded running header** — set `logo.position: "page-header"`, `logo.dataUrl`, `logo.aspect` (image width / height), and `header.text` together. The logo and text are vertically centered with an 8px gap; logo-only and text-only headers have no extra gap. Header logos are 14px tall with width capped at 160px; `logo.size` applies to title placements. `header.showDate` adds the date on the right. Do not imitate a running header with a Markdown image or spaces.
-- **Business report** — `corporate`, `toc`, `headingNumbers`, `cover.enabled`, `header.text: "{title}"`, `footer.text: "Confidential"`, `pageBreaks: "h1"`. Start with an *Executive summary* and a KPI table.
-- **Proposal / statement of work** — `editorial`, cover off, header `"Proposal — {title}"`; sections Overview → Objectives → Scope (phases as `###`) → Timeline (mermaid `gantt`) → Investment table → Acceptance table with signature rows.
+- **Branded running header** — only if the user asked for one, and never the document title. Set `logo.position: "page-header"`, `logo.dataUrl`, `logo.aspect` (image width / height), and a short `header.text` that is **not** the H1. The logo and text are vertically centered with an 8px gap; logo-only and text-only headers have no extra gap. Header logos are 14px tall with width capped at 160px; `logo.size` applies to title placements. `header.showDate` adds the date on the right. Do not imitate a running header with a Markdown image or spaces.
+- **Business report** — `corporate`, `toc`, `headingNumbers`, `cover.enabled`, **no running header**, `footer.text: "Confidential"` only if they want it, `pageBreaks: "h1"`. Start with an *Executive summary* and a KPI table.
+- **Proposal / statement of work** — `editorial`, cover off, **no running header**; sections Overview → Objectives → Scope (phases as `###`) → Timeline (mermaid `gantt`) → Investment table → Acceptance table with signature rows.
 - **README / technical doc** — `clean`, `toc`; titled code blocks, an options table (`Option | Type | Default | Description`), `> [!WARNING]` for gotchas.
-- **Meeting notes** — `forest`, `header.showDate`; Attendees line, Agenda (ordered list), Discussion (`###` per item), Decisions (✅/⏸ bullets), Action items (task list with **Owner** in bold and a due date).
+- **Meeting notes** — `forest`; Attendees line, Agenda (ordered list), Discussion (`###` per item), Decisions (✅/⏸ bullets), Action items (task list with **Owner** in bold and a due date). Date in the header only if they ask.
 - **Invoice** — `mono`, page numbers off, footer "Thank you for your business."; key–value table for From/To/Dates, items table with right-aligned amounts, totals table, payment details.
 - **Résumé / CV** — `clean`, `fontSize: "sm"`, `margins: "narrow"`, page numbers off; name as H1, one-line contact row, `##` per section, `###` per role with an `*italic*` dates line.
-- **Web page / article** — `import_web_page` first; `editorial` for long-form, `clean` + `toc` for docs; `header.text` = site name, page numbers on; keep the page title as the single H1, remove leftover "share"/"related" fragments, close with a *Source: <url>* footnote.
+- **Web page / article** — `import_web_page` first; `editorial` for long-form, `clean` + `toc` for docs; **no running header** (do not put the article title or site name in `header.text` unless they ask); page numbers on; keep the page title as the single H1, remove leftover "share"/"related" fragments, close with a *Source: <url>* footnote.
 
 ## Anti-patterns (these render badly)
 
@@ -270,20 +270,40 @@ Every nested field, enum, default and tool argument is listed at the end of this
 - Code fences without a language, or with a language for prose.
 - Very wide tables (> 6 columns portrait) or giant images — they get squeezed.
 - Hard-wrapped paragraphs and trailing double-spaces used as "formatting" — they create random line breaks.
+- Repeating the document title in `header.text` / `{title}` — the H1 already prints once; a running header duplicates it on every page. Leave the header empty unless they asked for a brand line that is not the title.
 - Emoji in `header.text` / `footer.text` — running heads use a print font without emoji glyphs.
 - Relative image paths (`./img/chart.png`) — the renderer cannot see your file system; use HTTPS URLs or `assets`.
 
-## Relaying options to the user
+## Before rendering: ask for styles every time
 
-When someone asks you to make a nice PDF, tell them the knobs they can turn — do not hide them. In plain language, offer:
+Do **not** call `render_pdf` until you have listed the design options below in plain language and the user has replied. This is required on every request — first render, re-render, "just make a PDF", "looks good, export it", prompts, and follow-ups. Showing options in the server instructions or this guide does not count; the person in the chat has to see them and answer.
+
+1. **List the knobs** (names, not raw JSON): theme, accent, fonts, size, background, paper, orientation, margins, TOC, numbered headings, cover, page breaks, running header/footer, page numbers, logo, file name.
+2. **Recommend a starting set** for this document type (see recipes). Default chrome is **minimal**: empty running header, no date in the header, footer page numbers only.
+3. **Wait.** If they pick, use their picks. If they say "you decide" *after seeing the options*, apply the recommendation. Do not skip the ask.
+
+### Keep the top of the page empty
+
+The `#` title already appears once as the document heading. Do **not** also put it in `header.text` (including `{title}`, the file name, or a paraphrase of the H1). That prints a second title on every page.
+
+Default unless the user explicitly asks otherwise:
+
+- `header.text`: `""` (no running header)
+- `header.showDate`: `false`
+- `footer.pageNumbers`: `true`
+- `footer.text`: `""` (add a short line only if they want "Confidential" or a company name)
+
+A running header is for a **brand line or logo that is not the document title**, and only when they asked for one.
+
+When listing options, in plain language offer:
 
 - **Look** — theme (clean, corporate, editorial, forest, mono, midnight), optional accent colour, body/heading fonts, size (compact / comfortable / large), page background
 - **Page** — paper (A4, Letter, Legal), portrait or landscape, margins (narrow / normal / wide)
 - **Structure** — table of contents, numbered headings, cover page (title, subtitle, author, date), automatic page breaks
-- **Chrome** — running header/footer text, date in the header, page numbers ("3 / 12" or "3"), logo placement
+- **Chrome** — default is none at the top (no running header, no repeated title). Optional: a short brand line that is **not** the H1, date in the header, footer text, page numbers ("3 / 12" or "3"), logo
 - **File name** — optional; otherwise taken from the H1
 
-Recommend a starting set from the recipes (report → corporate + TOC + cover, README → clean + TOC, invoice → mono, and so on). If they say "just make it look good", apply the matching recipe and mention what you chose.
+Recommend a starting set from the recipes (report → corporate + TOC + cover + **no running header**, README → clean + TOC, invoice → mono, and so on). Then wait.
 
 ## After rendering: give the user the download URL
 
@@ -333,7 +353,7 @@ No arguments. Returns id, name, description and recommended `settings` for each 
 | `invoice` | Invoice | Line items, totals and payment details. |
 | `resume` | Résumé | A clean single-column CV. |
 
-Returns the Markdown skeleton and the `settings` it was designed with. Pass those settings through to `render_pdf` unless the user overrides them.
+Returns the Markdown skeleton and the `settings` it was designed with. Use the structure; still ask the user about styles before `render_pdf`, and do not copy a running header that repeats the title.
 
 ### `analyze_markdown`
 
@@ -356,16 +376,16 @@ Renders a public web page in headless Chromium (5–25 s) — waiting for JavaSc
 | `stripImages` | no | Remove every image from the result. Default false. Use when the page is image-heavy or the images are decorative. |
 | `stripLinks` | no | Replace hyperlinks with their text (images are kept). Default false. Handy for print where links are not clickable anyway. |
 
-Use it whenever the user hands you a URL. Then polish the Markdown (fix the reported warnings, delete leftover "share"/"related" fragments, add a source footnote) and pass it to `render_pdf`. Without MCP the same import is `GET /api/scrape?url=…&images=true&links=true` (or `/api/scrapehtml`).
+Use it whenever the user hands you a URL. Then polish the Markdown (fix the reported warnings, delete leftover "share"/"related" fragments, add a source footnote), ask for styles, and pass it to `render_pdf`. Without MCP the same import is `GET /api/scrape?url=…&images=true&links=true` (or `/api/scrapehtml`).
 
 ### `render_pdf` / `render_html`
 
-Same arguments. `render_pdf` uses headless Chromium (3–15 s) and returns a 24-hour download URL in the text (`https://<host>/d/<id>.pdf`) plus an MCP `resource_link` — not a base64 PDF. `render_html` is fast and returns standalone HTML with the same CSS. As soon as `render_pdf` returns, give the user that URL (see **After rendering** above).
+Same arguments. `render_pdf` uses headless Chromium (3–15 s) and returns a 24-hour download URL in the text (`https://<host>/d/<id>.pdf`) plus an MCP `resource_link` — not a base64 PDF. Do not call it until you have listed style options and the user has answered. `render_html` is fast and returns standalone HTML with the same CSS. As soon as `render_pdf` returns, give the user that URL (see **After rendering** above).
 
 | Argument | Required | Meaning |
 | --- | --- | --- |
 | `markdown` | yes | The full GitHub-flavoured Markdown source (max 2 MB). Always pass the entire document — tools are stateless. |
-| `settings` | no | Document design settings. Every key is optional and merged over the defaults. When a user asks for a nice PDF, present these options (names below) so they can choose, then pass the chosen values here. |
+| `settings` | no | Document design settings. Every key is optional and merged over the defaults. You MUST list these options to the user and wait for their answer before calling render_pdf. Default chrome: no running header (do not put the title on every page). |
 | `assets` | no | Embedded images as a map of name → data URL (`data:image/png;base64,…`, JPEG, SVG, WebP, GIF). Reference in Markdown as `![alt](asset:name)`. Max 24 images, 3 MB each, 8 MB total. Remote HTTPS images can be used in Markdown without this map. |
 | `fileName` | no | Preferred output file name without extension (max 120 chars). Defaults to the first H1 / inferred title. Do not include .pdf or .html. |
 
@@ -389,7 +409,7 @@ Every key is optional. Unknown keys are ignored. Nested objects are merged field
 | `headingNumbers` | boolean | false | Auto-number H1–H3 as 1 / 1.1 / 1.1.1. Default false. Do not number headings by hand. |
 | `justify` | boolean | false | Justify body paragraphs. Default false. |
 | `header` | object | see below | Running header. Partial object is fine. |
-| `header.text` | string ≤200 | empty | Running header (max 200 chars). "{title}" is replaced with the document title. Keep short; no emoji. To pair text with a logo on every page, also set logo.position="page-header" and logo.aspect to the image width / height. Logo and text are vertically centered with an 8px gap only when both are present; either may be used alone. |
+| `header.text` | string ≤200 | empty | Running header (max 200 chars). Leave empty by default — the `#` heading already prints the title once. Do not set this to the document title or "{title}"; repeating it on every page looks like a duplicate masthead. Only set a short brand line when the user explicitly asks for a header that is not the title. No emoji. To pair text with a logo on every page, also set logo.position="page-header" and logo.aspect to the image width / height. |
 | `header.showDate` | boolean | false | Show today's date on the right of the header. Default false. |
 | `footer` | object | see below | Running footer. Partial object is fine. |
 | `footer.text` | string ≤200 | empty | Running footer (max 200 chars). Supports "{title}". Keep short; no emoji. |
@@ -493,7 +513,7 @@ Plus `"inherit"` on `font` / `headingFont` to keep the theme default.
 | `md` | Medium | 48px |
 | `lg` | Large | 72px |
 
-Placeholders: `{title}` in `header.text` / `footer.text` becomes the document title (the first H1). Forced page break in Markdown: `\\pagebreak` or `<!-- pagebreak -->` on its own line, or `{: .newpage }` on a heading. Image size hint: `![alt](url =WIDTHxHEIGHT)` (either dimension may be omitted, e.g. `=300x`).
+Placeholders: `{title}` in `header.text` / `footer.text` becomes the document title (the first H1). Do not put `{title}` in the running header by default — the H1 already prints once. Forced page break in Markdown: `\\pagebreak` or `<!-- pagebreak -->` on its own line, or `{: .newpage }` on a heading. Image size hint: `![alt](url =WIDTHxHEIGHT)` (either dimension may be omitted, e.g. `=300x`).
 
 ### Prompt arguments
 

@@ -29,18 +29,18 @@ export const SERVER_INFO = { name: 'markdown-studio', version: GUIDE_VERSION };
 
 export const SERVER_INSTRUCTIONS = `Markdown Studio turns Markdown into polished, print-ready PDFs (themes, cover page, table of contents, running header/footer, callouts, Mermaid diagrams, syntax-highlighted code).
 
-When a user asks you to make a nice PDF, explain the design arguments they can choose (theme, paper, fonts, TOC, cover, header/footer, logo, file name) using the catalog below, recommend a starting set for their document type, then pass their choices as settings to render_pdf. Call list_design_options if you need the live enum JSON.
+When a user asks you to make a nice PDF, you MUST list the design options (theme, paper, fonts, TOC, cover, header/footer, logo, file name) in plain language, recommend a starting set, and wait for their answer before calling render_pdf. Do this every time, including re-renders. Default chrome is minimal: no running header — never repeat the document title at the top of every page; the H1 already prints once. Call list_design_options if you need the live enum JSON.
 
 Recommended flow:
 1. Call get_markdown_guide once per session and follow it — it lists which syntax renders (no LaTeX, no HTML layouts, no YAML front-matter) and every tool/settings argument.
 2. Optionally call list_templates / get_template for a proven structure and matching design settings.
-3. Agree settings with the user (or apply the matching recipe if they want you to decide).
+3. List style options, recommend a starting set (empty running header), and wait. Do not call render_pdf until they pick or say you may decide.
 4. Write the Markdown, then call analyze_markdown and fix every warning. Default to automatic pagination; for deliberate section boundaries put \\pagebreak on its own paragraph BEFORE the heading (or \`{: .newpage }\` on the heading), never between its introduction and table. Do not put \`---\` above headings — H2s already have a rule. See the guide's Page breaks rules.
 5. Call render_pdf (returns a 24-hour download URL in the text, not a base64 PDF) or render_html. Inspect PDF page transitions and re-render with explicit breaks where needed; analyze_markdown cannot assess physical page layout.
 6. Immediately give the user that download URL (markdown link). In Cursor, also open it in a canvas whose iframe src is the URL. Details under "After rendering" below.
 All tools are stateless; pass the full markdown each time.
 
-When the source is a web page (an article, docs page, blog post, changelog…), call import_web_page with the URL first: it loads the page in a headless browser, strips navigation/ads and returns clean Markdown plus an analysis. Then polish that Markdown (fix the warnings) and render it — do not re-type page content from memory.
+When the source is a web page (an article, docs page, blog post, changelog…), call import_web_page with the URL first: it loads the page in a headless browser, strips navigation/ads and returns clean Markdown plus an analysis. Then polish that Markdown (fix the warnings), ask for styles, and render it — do not re-type page content from memory.
 
 ${ARGUMENT_CATALOG}`;
 
@@ -189,7 +189,7 @@ export function registerMarkdownStudio(server) {
     {
       title: 'List design options',
       description:
-        'JSON catalog of every valid `settings` value: defaults, themes (colours, dark/light, default fonts), fonts, font sizes, paper sizes, margins, backgrounds, page-break modes, logo positions/sizes, `{title}` placeholder, page-break directive and image size hint. Present these options to the user when they ask to make a nice PDF.',
+        'JSON catalog of every valid `settings` value: defaults, themes (colours, dark/light, default fonts), fonts, font sizes, paper sizes, margins, backgrounds, page-break modes, logo positions/sizes, `{title}` placeholder, page-break directive and image size hint. Present these options to the user and wait before calling render_pdf.',
       inputSchema: z.object({}),
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
@@ -302,7 +302,7 @@ export function registerMarkdownStudio(server) {
     {
       title: 'Render PDF',
       description:
-        'Render Markdown + settings to a PDF with headless Chromium (takes 3–15 s). Arguments: markdown (required), settings (optional design object — every field is documented on the schema and in get_markdown_guide), assets (optional image data URLs), fileName (optional, no extension). Returns a 24-hour https download URL in the text block (and an MCP resource_link) — not a base64 application/pdf attachment. Give the user that URL as a markdown link. In Cursor, open it in a canvas iframe whose src is the URL. Run analyze_markdown first and fix its warnings.',
+        'Render Markdown + settings to a PDF with headless Chromium (takes 3–15 s). Do not call this until you have listed style options (theme, paper, fonts, TOC, cover, header/footer) and the user has answered — every time, including re-renders. Default: no running header; do not put the document title or {title} on every page. Arguments: markdown (required), settings (optional design object — every field is documented on the schema and in get_markdown_guide), assets (optional image data URLs), fileName (optional, no extension). Returns a 24-hour https download URL in the text block (and an MCP resource_link) — not a base64 application/pdf attachment. Give the user that URL as a markdown link. In Cursor, open it in a canvas iframe whose src is the URL. Run analyze_markdown first and fix its warnings.',
       inputSchema: renderInput,
       annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
     },
@@ -501,11 +501,11 @@ export function registerMarkdownStudio(server) {
               '',
               'Rules:',
               '- Follow the Markdown Studio authoring guide exactly (call get_markdown_guide if you have not read it in this session).',
-              kind && kind !== 'other' ? `- Start from the "${kind}" template (get_template) and keep its recommended settings unless the brief says otherwise.` : '- Pick the closest template from list_templates and reuse its settings.',
+              kind && kind !== 'other' ? `- Start from the "${kind}" template (get_template) for structure. Do not copy a running header that repeats the title.` : '- Pick the closest template from list_templates for structure.',
               '- One `#` title, `##` sections, tables for structured data, callouts for key points, titled code blocks for code.',
               '- Do not put `---` above headings; H2s already have a rule and a divider looks like a double line.',
               '- Do not write a manual table of contents or number headings by hand; use settings.toc / settings.headingNumbers.',
-              '- Tell the user the design settings you will use (theme, paper, TOC, cover, header/footer) so they can change them; every argument is in get_markdown_guide / server instructions.',
+              '- Before render_pdf: list style options (theme, paper, fonts, TOC, cover, header/footer), recommend a starting set with an empty running header, and wait for the user. Never put the H1/{title} in header.text.',
               '- Run analyze_markdown and fix every warning before rendering.',
               '- Finish by calling render_pdf with the chosen settings, then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL) and report the file name.',
             ].join('\n'),
@@ -535,7 +535,7 @@ export function registerMarkdownStudio(server) {
               '1. Call analyze_markdown on it and read the warnings.',
               '2. Apply the authoring guide (get_markdown_guide): a single H1, no skipped heading levels, no `---` above headings, languages on code fences, GitHub callouts instead of bold "Note:" lines, real tables instead of aligned text, footnotes for sources, no LaTeX/HTML/front-matter.',
               '3. Re-run analyze_markdown until there are no warnings.',
-              '4. Suggest a full settings object (theme, paper, fonts, TOC, cover, header/footer) using the argument catalog, then return the polished Markdown.',
+              '4. Suggest a full settings object (theme, paper, fonts, TOC, cover, header/footer) using the argument catalog — empty running header unless they asked for a brand line — list the options, wait, then return the polished Markdown.',
               '',
               '```md',
               markdown,
@@ -574,7 +574,7 @@ export function registerMarkdownStudio(server) {
               '2. Clean the Markdown without changing its meaning: keep a single H1 (the page title), remove leftover navigation/"share"/"related" fragments, delete `---` above headings, fix skipped heading levels, add languages to code fences, turn "Note:"-style paragraphs into callouts, and drop broken or tracking links. Keep images that carry information; drop decorative ones.',
               '3. Add a closing line or footnote with the source URL and the import date.',
               '4. Run analyze_markdown until there are no warnings.',
-              '5. Tell the user the design settings you propose (theme, paper, TOC, header/footer with the site name, page numbers) — pick "clean" + toc for docs, "editorial" for long-form articles — and apply what they confirm.',
+              '5. List design options (theme, paper, TOC, header/footer, page numbers) and wait — pick "clean" + toc for docs, "editorial" for long-form articles. Default: no running header (do not put the article title or site name on every page). Apply what they confirm.',
               '6. Call render_pdf with markdown + settings + fileName (use the suggested fileName), then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL) and report the result.',
             ]
               .filter(Boolean)
@@ -609,13 +609,13 @@ export function registerMarkdownStudio(server) {
               brief ? `Brief:\n${brief}` : '',
               markdown ? `Existing Markdown:\n\`\`\`md\n${markdown}\n\`\`\`` : '',
               '',
-              'You must relay the available arguments to the user (from get_markdown_guide / list_design_options / server instructions), not just pick silently:',
+              'You must list the available arguments to the user (from get_markdown_guide / list_design_options / server instructions) and wait for their answer before render_pdf, every time:',
               '- Look: theme, accentColor, font, headingFont, fontSize, background',
               '- Page: paperSize, orientation, margins',
               '- Structure: toc, headingNumbers, cover (enabled, title, subtitle, author, date, showLogo), pageBreaks',
-              '- Chrome: header.text, header.showDate, footer.text, footer.pageNumbers, footer.pageNumberStyle, logo',
+              '- Chrome: header.text (default empty — do not repeat the title), header.showDate, footer.text, footer.pageNumbers, footer.pageNumberStyle, logo',
               '- Output: fileName; optional assets for local images',
-              'Recommend a recipe for this document type, apply what they confirm (or your recommendation if they want you to decide).',
+              'Recommend a recipe for this document type with an empty running header (do not repeat the H1 on every page). Wait for them to pick or say you may decide, then apply that.',
               'Follow the authoring guide (no `---` above headings). Run analyze_markdown and fix warnings. Call render_pdf with markdown + settings + assets + fileName, then give the user the download URL from the result (markdown link; Cursor: canvas iframe src = that URL). Tell them the file name and which settings you used.',
             ]
               .filter(Boolean)

@@ -51,7 +51,7 @@ export const FIELD_HELP = {
   markdown: `The full GitHub-flavoured Markdown source (max ${MAX_MARKDOWN_BYTES / (1024 * 1024)} MB). Always pass the entire document — tools are stateless.`,
   fileName: 'Preferred output file name without extension (max 120 chars). Defaults to the first H1 / inferred title. Do not include .pdf or .html.',
   assets: `Embedded images as a map of name → data URL (\`data:image/png;base64,…\`, JPEG, SVG, WebP, GIF). Reference in Markdown as \`![alt](asset:name)\`. Max ${MAX_ASSETS} images, ${MAX_ASSET_BYTES / (1024 * 1024)} MB each, ${MAX_TOTAL_ASSET_BYTES / (1024 * 1024)} MB total. Remote HTTPS images can be used in Markdown without this map.`,
-  settings: 'Document design settings. Every key is optional and merged over the defaults. When a user asks for a nice PDF, present these options (names below) so they can choose, then pass the chosen values here.',
+  settings: 'Document design settings. Every key is optional and merged over the defaults. You MUST list these options to the user and wait for their answer before calling render_pdf. Default chrome: no running header (do not put the title on every page).',
   theme: `Colour and typography theme. One of ${quoted(THEME_IDS)}. Default "${DEFAULT_SETTINGS.theme}".`,
   font: `Body font. "inherit" uses the theme default. Otherwise one of ${quoted(FONT_IDS)}. Default "${DEFAULT_SETTINGS.font}".`,
   headingFont: `Heading font. "inherit" uses the theme default. Otherwise one of ${quoted(FONT_IDS)}. Default "${DEFAULT_SETTINGS.headingFont}".`,
@@ -75,7 +75,7 @@ export const FIELD_HELP = {
   toc: `Insert a generated table of contents from ## / ### (after the title, or on its own page when a cover is on). Default ${DEFAULT_SETTINGS.toc}. Do not write a TOC by hand.`,
   headingNumbers: `Auto-number H1–H3 as 1 / 1.1 / 1.1.1. Default ${DEFAULT_SETTINGS.headingNumbers}. Do not number headings by hand.`,
   justify: `Justify body paragraphs. Default ${DEFAULT_SETTINGS.justify}.`,
-  headerText: 'Running header (max 200 chars). "{title}" is replaced with the document title. Keep short; no emoji. To pair text with a logo on every page, also set logo.position="page-header" and logo.aspect to the image width / height. Logo and text are vertically centered with an 8px gap only when both are present; either may be used alone.',
+  headerText: 'Running header (max 200 chars). Leave empty by default — the `#` heading already prints the title once. Do not set this to the document title or "{title}"; repeating it on every page looks like a duplicate masthead. Only set a short brand line when the user explicitly asks for a header that is not the title. No emoji. To pair text with a logo on every page, also set logo.position="page-header" and logo.aspect to the image width / height.',
   headerShowDate: `Show today's date on the right of the header. Default ${DEFAULT_SETTINGS.header.showDate}.`,
   footerText: 'Running footer (max 200 chars). Supports "{title}". Keep short; no emoji.',
   footerPageNumbers: `Show page numbers. Default ${DEFAULT_SETTINGS.footer.pageNumbers}.`,
@@ -101,6 +101,31 @@ export const FIELD_HELP = {
   stripImages: 'Remove every image from the result. Default false. Use when the page is image-heavy or the images are decorative.',
   stripLinks: 'Replace hyperlinks with their text (images are kept). Default false. Handy for print where links are not clickable anyway.',
 };
+
+/**
+ * Gate before every render: list style options and wait. Shared by server
+ * instructions, the authoring guide, the render_pdf description and the skill.
+ */
+export const ASK_STYLES_INSTRUCTIONS = `## Before rendering: ask for styles every time
+
+Do **not** call \`render_pdf\` until you have listed the design options below in plain language and the user has replied. This is required on every request — first render, re-render, "just make a PDF", "looks good, export it", prompts, and follow-ups. Showing options in the server instructions or this guide does not count; the person in the chat has to see them and answer.
+
+1. **List the knobs** (names, not raw JSON): theme, accent, fonts, size, background, paper, orientation, margins, TOC, numbered headings, cover, page breaks, running header/footer, page numbers, logo, file name.
+2. **Recommend a starting set** for this document type (see recipes). Default chrome is **minimal**: empty running header, no date in the header, footer page numbers only.
+3. **Wait.** If they pick, use their picks. If they say "you decide" *after seeing the options*, apply the recommendation. Do not skip the ask.
+
+### Keep the top of the page empty
+
+The \`#\` title already appears once as the document heading. Do **not** also put it in \`header.text\` (including \`{title}\`, the file name, or a paraphrase of the H1). That prints a second title on every page.
+
+Default unless the user explicitly asks otherwise:
+
+- \`header.text\`: \`""\` (no running header)
+- \`header.showDate\`: \`false\`
+- \`footer.pageNumbers\`: \`true\`
+- \`footer.text\`: \`""\` (add a short line only if they want "Confidential" or a company name)
+
+A running header is for a **brand line or logo that is not the document title**, and only when they asked for one.`;
 
 /**
  * What the agent must do the moment `render_pdf` returns. Shared by the server
@@ -173,17 +198,17 @@ export function buildArgumentCatalog() {
     TEMPLATES.map((t) => [`\`${t.id}\``, t.name, t.description.replace(/\|/g, '\\|')]),
   );
 
-  return `## Relaying options to the user
+  return `${ASK_STYLES_INSTRUCTIONS}
 
-When someone asks you to make a nice PDF, tell them the knobs they can turn — do not hide them. In plain language, offer:
+When listing options, in plain language offer:
 
 - **Look** — theme (${THEME_IDS.join(', ')}), optional accent colour, body/heading fonts, size (compact / comfortable / large), page background
 - **Page** — paper (${keys(PAPER_SIZES).join(', ')}), portrait or landscape, margins (narrow / normal / wide)
 - **Structure** — table of contents, numbered headings, cover page (title, subtitle, author, date), automatic page breaks
-- **Chrome** — running header/footer text, date in the header, page numbers ("3 / 12" or "3"), logo placement
+- **Chrome** — default is none at the top (no running header, no repeated title). Optional: a short brand line that is **not** the H1, date in the header, footer text, page numbers ("3 / 12" or "3"), logo
 - **File name** — optional; otherwise taken from the H1
 
-Recommend a starting set from the recipes (report → corporate + TOC + cover, README → clean + TOC, invoice → mono, and so on). If they say "just make it look good", apply the matching recipe and mention what you chose.
+Recommend a starting set from the recipes (report → corporate + TOC + cover + **no running header**, README → clean + TOC, invoice → mono, and so on). Then wait.
 
 ${OPEN_PDF_INSTRUCTIONS}
 
@@ -211,7 +236,7 @@ No arguments. Returns id, name, description and recommended \`settings\` for eac
 
 ${templateTable}
 
-Returns the Markdown skeleton and the \`settings\` it was designed with. Pass those settings through to \`render_pdf\` unless the user overrides them.
+Returns the Markdown skeleton and the \`settings\` it was designed with. Use the structure; still ask the user about styles before \`render_pdf\`, and do not copy a running header that repeats the title.
 
 ### \`analyze_markdown\`
 
@@ -234,11 +259,11 @@ Renders a public web page in headless Chromium (5–25 s) — waiting for JavaSc
 | \`stripImages\` | no | ${FIELD_HELP.stripImages} |
 | \`stripLinks\` | no | ${FIELD_HELP.stripLinks} |
 
-Use it whenever the user hands you a URL. Then polish the Markdown (fix the reported warnings, delete leftover "share"/"related" fragments, add a source footnote) and pass it to \`render_pdf\`. Without MCP the same import is \`GET /api/scrape?url=…&images=true&links=true\` (or \`/api/scrapehtml\`).
+Use it whenever the user hands you a URL. Then polish the Markdown (fix the reported warnings, delete leftover "share"/"related" fragments, add a source footnote), ask for styles, and pass it to \`render_pdf\`. Without MCP the same import is \`GET /api/scrape?url=…&images=true&links=true\` (or \`/api/scrapehtml\`).
 
 ### \`render_pdf\` / \`render_html\`
 
-Same arguments. \`render_pdf\` uses headless Chromium (3–15 s) and returns a 24-hour download URL in the text (\`https://<host>/d/<id>.pdf\`) plus an MCP \`resource_link\` — not a base64 PDF. \`render_html\` is fast and returns standalone HTML with the same CSS. As soon as \`render_pdf\` returns, give the user that URL (see **After rendering** above).
+Same arguments. \`render_pdf\` uses headless Chromium (3–15 s) and returns a 24-hour download URL in the text (\`https://<host>/d/<id>.pdf\`) plus an MCP \`resource_link\` — not a base64 PDF. Do not call it until you have listed style options and the user has answered. \`render_html\` is fast and returns standalone HTML with the same CSS. As soon as \`render_pdf\` returns, give the user that URL (see **After rendering** above).
 
 | Argument | Required | Meaning |
 | --- | --- | --- |
@@ -326,7 +351,7 @@ ${logoPosTable}
 
 ${logoSizeTable}
 
-Placeholders: \`{title}\` in \`header.text\` / \`footer.text\` becomes the document title (the first H1). Forced page break in Markdown: \`\\\\pagebreak\` or \`<!-- pagebreak -->\` on its own line, or \`{: .newpage }\` on a heading. Image size hint: \`![alt](url =WIDTHxHEIGHT)\` (either dimension may be omitted, e.g. \`=300x\`).
+Placeholders: \`{title}\` in \`header.text\` / \`footer.text\` becomes the document title (the first H1). Do not put \`{title}\` in the running header by default — the H1 already prints once. Forced page break in Markdown: \`\\\\pagebreak\` or \`<!-- pagebreak -->\` on its own line, or \`{: .newpage }\` on a heading. Image size hint: \`![alt](url =WIDTHxHEIGHT)\` (either dimension may be omitted, e.g. \`=300x\`).
 
 ### Prompt arguments
 

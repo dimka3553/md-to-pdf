@@ -8,7 +8,7 @@
 
 import { ARGUMENT_CATALOG } from './arguments.js';
 
-export const GUIDE_VERSION = '1.6.0';
+export const GUIDE_VERSION = '1.6.1';
 
 export const MARKDOWN_GUIDE = `# Writing Markdown for Markdown Studio
 
@@ -22,7 +22,7 @@ front-matter, custom CSS) does **not**.
 2. Pick a starting point: \`list_templates\` → \`get_template\` gives you proven structure **and** matching design settings for reports, proposals, READMEs, meeting notes, invoices and résumés. If the source is a web page, call \`import_web_page\` with the URL instead — it returns clean Markdown, metadata and an analysis; never retype page content from memory.
 3. Write the Markdown. One \`#\` title, \`##\` sections, short paragraphs, generous use of tables, callouts and code blocks.
 4. Run \`analyze_markdown\` — it returns the outline plus warnings (skipped heading levels, code fences without a language, YAML front-matter, missing images, ragged tables…). Fix everything it reports.
-5. If the user asked for a nice PDF, tell them the design knobs (theme, paper, TOC, cover, header/footer, fonts) and agree a \`settings\` object — the full argument list is at the end of this guide.
+5. **Ask for styles every time** — list theme, paper, fonts, TOC, cover, header/footer and the other knobs (full list at the end of this guide) and wait for an answer before \`render_pdf\`. Recommend a starting set. Default chrome is **no running header**: do not put the title (or \`{title}\`) at the top of every page; the H1 already prints once. See *Before rendering*.
 6. Render with \`render_pdf\` (or \`render_html\` for a quick look). Pass \`markdown\`, \`settings\`, optional \`assets\` and \`fileName\`.
 7. **Give the user the download URL** from the \`render_pdf\` text result (\`https://<host>/d/<id>.pdf\`, valid 24 hours). Do not expect a base64 PDF attachment. See *After rendering* at the end of this guide.
 
@@ -205,7 +205,7 @@ Pass a \`settings\` object to \`render_pdf\` / \`render_html\`. Every key is opt
   "toc": true,
   "headingNumbers": true,
   "justify": false,
-  "header": { "text": "{title}", "showDate": true },
+  "header": { "text": "", "showDate": false },
   "footer": { "text": "Confidential", "pageNumbers": true, "pageNumberStyle": "n-of-total" },
   "cover": { "enabled": true, "title": "", "subtitle": "Quarterly review", "author": "Strategy team", "date": "Q3 2026", "showLogo": true },
   "logo": { "dataUrl": "data:image/png;base64,…", "position": "title-right", "size": "md" }
@@ -227,14 +227,14 @@ Every nested field, enum, default and tool argument is listed at the end of this
 
 ## Recipes
 
-- **Branded running header** — set \`logo.position: "page-header"\`, \`logo.dataUrl\`, \`logo.aspect\` (image width / height), and \`header.text\` together. The logo and text are vertically centered with an 8px gap; logo-only and text-only headers have no extra gap. Header logos are 14px tall with width capped at 160px; \`logo.size\` applies to title placements. \`header.showDate\` adds the date on the right. Do not imitate a running header with a Markdown image or spaces.
-- **Business report** — \`corporate\`, \`toc\`, \`headingNumbers\`, \`cover.enabled\`, \`header.text: "{title}"\`, \`footer.text: "Confidential"\`, \`pageBreaks: "h1"\`. Start with an *Executive summary* and a KPI table.
-- **Proposal / statement of work** — \`editorial\`, cover off, header \`"Proposal — {title}"\`; sections Overview → Objectives → Scope (phases as \`###\`) → Timeline (mermaid \`gantt\`) → Investment table → Acceptance table with signature rows.
+- **Branded running header** — only if the user asked for one, and never the document title. Set \`logo.position: "page-header"\`, \`logo.dataUrl\`, \`logo.aspect\` (image width / height), and a short \`header.text\` that is **not** the H1. The logo and text are vertically centered with an 8px gap; logo-only and text-only headers have no extra gap. Header logos are 14px tall with width capped at 160px; \`logo.size\` applies to title placements. \`header.showDate\` adds the date on the right. Do not imitate a running header with a Markdown image or spaces.
+- **Business report** — \`corporate\`, \`toc\`, \`headingNumbers\`, \`cover.enabled\`, **no running header**, \`footer.text: "Confidential"\` only if they want it, \`pageBreaks: "h1"\`. Start with an *Executive summary* and a KPI table.
+- **Proposal / statement of work** — \`editorial\`, cover off, **no running header**; sections Overview → Objectives → Scope (phases as \`###\`) → Timeline (mermaid \`gantt\`) → Investment table → Acceptance table with signature rows.
 - **README / technical doc** — \`clean\`, \`toc\`; titled code blocks, an options table (\`Option | Type | Default | Description\`), \`> [!WARNING]\` for gotchas.
-- **Meeting notes** — \`forest\`, \`header.showDate\`; Attendees line, Agenda (ordered list), Discussion (\`###\` per item), Decisions (✅/⏸ bullets), Action items (task list with **Owner** in bold and a due date).
+- **Meeting notes** — \`forest\`; Attendees line, Agenda (ordered list), Discussion (\`###\` per item), Decisions (✅/⏸ bullets), Action items (task list with **Owner** in bold and a due date). Date in the header only if they ask.
 - **Invoice** — \`mono\`, page numbers off, footer "Thank you for your business."; key–value table for From/To/Dates, items table with right-aligned amounts, totals table, payment details.
 - **Résumé / CV** — \`clean\`, \`fontSize: "sm"\`, \`margins: "narrow"\`, page numbers off; name as H1, one-line contact row, \`##\` per section, \`###\` per role with an \`*italic*\` dates line.
-- **Web page / article** — \`import_web_page\` first; \`editorial\` for long-form, \`clean\` + \`toc\` for docs; \`header.text\` = site name, page numbers on; keep the page title as the single H1, remove leftover "share"/"related" fragments, close with a *Source: <url>* footnote.
+- **Web page / article** — \`import_web_page\` first; \`editorial\` for long-form, \`clean\` + \`toc\` for docs; **no running header** (do not put the article title or site name in \`header.text\` unless they ask); page numbers on; keep the page title as the single H1, remove leftover "share"/"related" fragments, close with a *Source: <url>* footnote.
 
 ## Anti-patterns (these render badly)
 
@@ -247,6 +247,7 @@ Every nested field, enum, default and tool argument is listed at the end of this
 - Code fences without a language, or with a language for prose.
 - Very wide tables (> 6 columns portrait) or giant images — they get squeezed.
 - Hard-wrapped paragraphs and trailing double-spaces used as "formatting" — they create random line breaks.
+- Repeating the document title in \`header.text\` / \`{title}\` — the H1 already prints once; a running header duplicates it on every page. Leave the header empty unless they asked for a brand line that is not the title.
 - Emoji in \`header.text\` / \`footer.text\` — running heads use a print font without emoji glyphs.
 - Relative image paths (\`./img/chart.png\`) — the renderer cannot see your file system; use HTTPS URLs or \`assets\`.
 

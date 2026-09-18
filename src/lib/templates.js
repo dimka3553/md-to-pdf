@@ -82,7 +82,7 @@ export const TEMPLATES = [
     id: 'report',
     name: 'Business report',
     description: 'Cover page, contents, numbered sections.',
-    settings: { theme: 'corporate', toc: true, headingNumbers: true, cover: { enabled: true, subtitle: 'Quarterly performance review', author: 'Prepared by the Strategy team', date: 'Q3 2026', showLogo: true }, header: { text: '{title}', showDate: true }, footer: { text: 'Confidential — internal use only', pageNumbers: true, pageNumberStyle: 'n-of-total' }, pageBreaks: 'h1' },
+    settings: { theme: 'corporate', toc: true, headingNumbers: true, cover: { enabled: true, subtitle: 'Quarterly performance review', author: 'Prepared by the Strategy team', date: 'Q3 2026', showLogo: true }, header: { text: '', showDate: false }, footer: { text: 'Confidential — internal use only', pageNumbers: true, pageNumberStyle: 'n-of-total' }, pageBreaks: 'h1' },
     markdown: `# Quarterly Business Review
 
 ## Executive summary
@@ -136,7 +136,7 @@ xychart-beta
     id: 'proposal',
     name: 'Project proposal',
     description: 'Scope, timeline, budget and acceptance.',
-    settings: { theme: 'editorial', toc: false, cover: { enabled: false }, header: { text: 'Proposal — {title}', showDate: false }, footer: { text: 'Studio North · hello@studionorth.example', pageNumbers: true } },
+    settings: { theme: 'editorial', toc: false, cover: { enabled: false }, header: { text: '', showDate: false }, footer: { text: 'Studio North · hello@studionorth.example', pageNumbers: true } },
     markdown: `# Website Redesign Proposal
 
 **Prepared for:** Acme Corp  
@@ -276,7 +276,7 @@ MIT © Acme Inc.
     id: 'meeting',
     name: 'Meeting notes',
     description: 'Agenda, decisions and action items.',
-    settings: { theme: 'forest', footer: { text: '', pageNumbers: true }, header: { text: '', showDate: true } },
+    settings: { theme: 'forest', footer: { text: '', pageNumbers: true }, header: { text: '', showDate: false } },
     markdown: `# Product Sync — 15 September 2026
 
 **Attendees:** Maya (PM), Jonas (Eng), Priya (Design), Lee (Support)  

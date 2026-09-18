@@ -166,7 +166,7 @@ Renders Markdown to a PDF.
     "toc": true,
     "headingNumbers": false,
     "pageBreaks": "auto",
-    "header": { "text": "{title}", "showDate": true },
+    "header": { "text": "", "showDate": false },
     "footer": { "text": "Confidential", "pageNumbers": true, "pageNumberStyle": "n-of-total" },
     "cover": { "enabled": false },
     "logo": { "dataUrl": "data:image/png;base64,...", "position": "title-right", "size": "md" }
